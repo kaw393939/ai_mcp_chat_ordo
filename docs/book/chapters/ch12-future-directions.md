@@ -42,7 +42,7 @@ This repository already shows early forms of future patterns:
 
 This is not speculative. It is a present-day prototype of language-native engineering workflow.
 
-## Repository Example
+## Additional Evidence
 - This project already demonstrates a proto-intent compiler pattern: named framework prompt -> sprint plan -> implementation -> validation evidence.
 - The next increment is formalizing these transitions into generated quality scorecards and automated doc synchronization.
 

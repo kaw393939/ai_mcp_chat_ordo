@@ -38,7 +38,7 @@ This repository uses executable controls rather than narrative-only guidance:
 
 These are governance mechanisms because they can fail builds, block unsafe startup, and expose drift conditions early.
 
-## Repository Example
+## Additional Evidence
 - Secrets and config checks are executable via `scripts/validate-env.ts` and `scripts/scan-secrets.mjs`.
 - Release integrity is guarded by `scripts/generate-release-manifest.mjs` and `scripts/validate-release-manifest.mjs`.
 - Startup safety is reinforced by the production entrypoint `scripts/start-server.mjs` with graceful drain behavior.

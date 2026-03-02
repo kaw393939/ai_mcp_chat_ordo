@@ -41,7 +41,7 @@ Evaluation loops should be tied to real runtime characteristics, not only synthe
 
 That closes the loop between observation and design improvement.
 
-## Repository Example
+## Additional Evidence
 - Request correlation and error taxonomy are embedded in route envelopes via `requestId` and `errorCode` fields.
 - Observability now uses a publisher/listener model (`src/lib/observability/events.ts`) to keep signal emission extensible.
 - Route metrics are emitted as structured events and can be shipped externally without in-process aggregation coupling.

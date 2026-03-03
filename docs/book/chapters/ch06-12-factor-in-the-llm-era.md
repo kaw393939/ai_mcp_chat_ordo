@@ -10,20 +10,43 @@ LLM-enabled apps are still apps. They still fail in predictable ways: configurat
 
 ## Factor Reinterpretation for LLM Systems
 
+> These factors were distilled by Adam Wiggins and the Heroku team from thousands of real deployments. See [Chapter 0](ch00-the-people-behind-the-principles.md) for the full story.
+
+### Codebase (I)
+One codebase tracked in version control, many deploys. LLM applications often proliferate experimental forks that diverge silently. Treat model-specific configurations, prompt contracts, and tool schemas as code — not as ad-hoc customizations outside the repository.
+
+### Dependencies (II)
+Explicitly declare and isolate all dependencies. In LLM systems this extends to model versions: a dependency on `claude-haiku-4-5` is as versioned a dependency as `react@19`. Undeclared behavioral dependencies on implicit model versions are a frequent, hard-to-debug failure mode.
+
 ### Config (III)
-External model keys and model identifiers increase secret and drift risk. Config must be centralized, validated, and environment-specific.
+External model keys and model identifiers increase secret and drift risk. Config must be centralized, validated, and environment-specific. Never hardcode API keys or model aliases in source. Validate at startup so misconfiguration fails loudly rather than silently.
 
 ### Backing Services (IV)
-LLM providers are attached resources that can fail, timeout, or change behavior. Provider abstraction and resilience strategy are essential.
+LLM providers are attached resources — external services accessed over a network — that can fail, timeout, or change behavior without notice. Provider abstraction and resilience strategy (retries, fallback chains) are not optional.
 
 ### Build/Release/Run (V)
-When model behavior and runtime settings interact, reproducibility depends on strict stage separation and release metadata.
+When model behavior and runtime settings interact, reproducibility depends on strict stage separation and release metadata. A build artifact should be immutable. A release pairs that build with environment-specific config. A run executes a specific, traceable release — not an ambiguous combination of local files.
+
+### Processes (VI)
+Execute the app as one or more stateless processes. For LLM routes, this means no in-memory conversation state that survives process restarts. Session state belongs in the client or an external store — never in a module-level variable that disappears on redeploy.
+
+### Port Binding (VII)
+Export services via port binding. Health and readiness endpoints make the application's contract explicit and independently verifiable, without relying on platform-specific mechanisms to expose the service.
+
+### Concurrency (VIII)
+Scale out via the process model, not by making individual processes larger. Streaming and API routes are inherently concurrent. Design for stateless horizontal scale rather than vertical scaling of a single stateful instance.
 
 ### Disposability (IX)
-Streaming routes make shutdown semantics critical; graceful drain behavior is no longer optional for production reliability.
+Streaming routes make shutdown semantics critical. Graceful drain behavior is no longer optional. A process that cannot stop cleanly will corrupt in-flight requests and make zero-downtime deployment impossible.
 
-### Logs and Admin Processes (XI/XII)
-Operational trust requires structured events, correlation IDs, and executable one-off commands.
+### Dev/Prod Parity (X)
+Keep development, staging, and production as similar as possible. For LLM apps, this includes model behavior: using a smaller or different model locally than in production creates a parity gap that can produce significant behavioral divergence before any code is deployed.
+
+### Logs (XI)
+Treat logs as event streams. Structure them so they can be aggregated, queried, and acted on. Request correlation IDs and error taxonomy make incident response possible; ad hoc log strings and `console.log` make it a guessing game.
+
+### Admin Processes (XII)
+Run admin and management tasks as one-off processes in the same environment as production. Secret rotation, health sweeps, release validation, and environment diagnosis should be executable identically in production and development.
 
 ## Repository Example: Practical Compliance Moves
 This repository implemented concrete 12-factor controls:

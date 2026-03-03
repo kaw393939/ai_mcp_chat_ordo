@@ -3,6 +3,8 @@
 ## Abstract
 LLM systems change how software is specified and built: intent can be expressed in natural language and executed through structured orchestration loops. This chapter defines the core thesis of the book: language is now part of the implementation surface.
 
+> The people behind the frameworks referenced throughout this book — the Gang of Four, Robert C. Martin, Adam Wiggins, and the Anthropic team — are covered in [Chapter 0](ch00-the-people-behind-the-principles.md). If those names are unfamiliar, start there. Understanding what frustrated these practitioners makes the principles far easier to apply correctly.
+
 ## The Shift
 Most software revolutions are interface revolutions. We moved from punch cards to terminals, from assembly to high-level languages, from raw sockets to frameworks. Each step increased the amount of intent we could express with fewer symbols. What changed with LLM systems is not the need for precision, but where precision lives.
 

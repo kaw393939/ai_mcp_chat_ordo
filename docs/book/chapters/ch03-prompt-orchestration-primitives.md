@@ -51,6 +51,8 @@ Use this skeleton as a baseline orchestration contract:
 6. Validation: define exact commands and expected status.
 7. Deliverable: define required artifacts.
 
+> The execution loop that puts these primitives into practice — audit, plan, sprint, verify, archive — is covered in [Chapter 5](ch05-audit-to-sprint-loop.md).
+
 ## Anti-Patterns
 - Vague objective with no constraints.
 - Multiple priorities with no sequencing.

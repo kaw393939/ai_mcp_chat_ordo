@@ -14,6 +14,8 @@ Named frameworks in orchestration work the same way. A phrase like "12-factor au
 
 This compression is valuable because it increases alignment speed. But compression always trades explicitness for brevity. The risk is not using names; the risk is using names without local contracts.
 
+> The origin stories behind these frameworks — who coined them, what broke, and why they cared — are covered in [Chapter 0](ch00-the-people-behind-the-principles.md).
+
 ## The Contract Pattern
 Use this pattern whenever you invoke a named framework:
 
@@ -45,11 +47,6 @@ Use framework names as a start condition, then immediately force local precision
 - **Name-only prompting**: invokes a framework but gives no concrete boundaries.
 - **Dogmatic transfer**: applies framework rules mechanically without contextual adaptation.
 - **Validation gap**: declares compliance without measurable evidence.
-
-## Repository Example
-- "12-factor" produced a full audit, sprint decomposition, and implementation sequence across config, health, logs, parity, and admin processes.
-- "GoF" yielded explicit pattern upgrades (Observer, Decorator, Chain, Template Method, Facade) in runtime modules.
-- "Uncle Bob" framing drove SRP/module-boundary refactors and tighter test coverage.
 
 ## Exercise
 Pick one named framework you often use and write:

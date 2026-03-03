@@ -53,6 +53,9 @@ docker compose up --build
 
 ## Table of Contents
 
+0. [Chapter 0 - The People Behind the Principles](docs/book/chapters/ch00-the-people-behind-the-principles.md)  
+	Abstract: Tells the human stories behind GoF, SOLID, 12-Factor, TDD, and MCP — who these people were, what frustrated them, and how their work converges in this project.
+
 1. [Chapter 1 - Why This Moment Matters](docs/book/chapters/ch01-why-this-moment-matters.md)  
 	Abstract: Defines why LLM systems change engineering practice, and introduces the central claim that words now function as programmable intent.
 

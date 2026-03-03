@@ -63,12 +63,9 @@ Create a one-year roadmap for your team with:
 
 Attach measurable success signals to each item.
 
-## QA Questions
-- Does the chapter separate plausible near-term evolution from speculation?
-- Are proposed future steps grounded in current repository capabilities?
-
 ## Chapter Checklist
-- Are forecasts grounded in current evidence?
+- Do forecasts separate evidence-based near-term trends from longer-term speculation?
+- Are proposed future steps grounded in current repository capabilities?
 - Are recommendations actionable now?
 - Is the human role explicitly preserved in governance and verification?
 

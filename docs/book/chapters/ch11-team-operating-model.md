@@ -24,6 +24,19 @@ Owns runtime controls, runbooks, admin commands, and deployment integrity.
 
 Roles can be combined in small teams, but responsibilities should stay explicit.
 
+## Solo and Small Team Adaptation
+
+In a one- or two-person team, all four roles are carried by fewer people. The critical discipline is not role separation — it is *checkpoint* separation.
+
+A solo practitioner acting as architecture lead must not immediately context-switch to implementer without recording the architecture decision. A two-person team should separate the person who writes a sprint plan from the person who validates its completion.
+
+The minimum viable operating model for a solo practitioner:
+1. Write the objective and acceptance criteria before starting.
+2. Implement and validate against those criteria.
+3. Archive the decision and outcome in a durable artifact before moving to the next task.
+
+The process does not require a team. It requires the discipline of switching between roles explicitly rather than holding all of them simultaneously and invisibly.
+
 ## Practical Lens
 Adopt lightweight rituals that preserve alignment without introducing heavy process overhead.
 
@@ -75,11 +88,9 @@ Run one sprint using explicit role assignment and ritual checkpoints. Then run t
 
 Most teams find that explicit roles reduce rework even when they initially feel slower.
 
-## QA Questions
+## Chapter Checklist
 - Are role boundaries visible in artifacts, not only implied in conversation?
 - Can a new engineer reconstruct decisions from repository history alone?
-
-## Chapter Checklist
 - Are responsibilities explicit and observable?
 - Do rituals produce durable artifacts?
 - Can new contributors understand what happened and why?

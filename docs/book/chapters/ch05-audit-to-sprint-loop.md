@@ -27,14 +27,16 @@ The audit-to-sprint loop solves that gap by converting diagnosis into controlled
 
 This is not ceremony for its own sake. It is memory architecture for complex change.
 
+> Building high-quality sprint contracts requires precision in how you frame scope, invariants, and acceptance criteria. Those primitives are defined in [Chapter 3](ch03-prompt-orchestration-primitives.md).
+
 ## Repository Example: Loop in Action
 This repository exercised the full loop in visible artifacts:
 
 - `sprints/planning` stored scoped plans.
 - `sprints/active` marked current execution focus.
-- `sprints/completed` preserved implemented sprint records and QA audit outputs.
+- `sprints/completed` preserved implemented sprint records and QA audit outputs, including `QA-AUDIT.md` and `QA-AUDIT-12FACTOR.md` as objective evidence after each implementation wave.
 
-The 12-factor wave and GoF wave both followed this model. The system improved while preserving traceability of why each change happened.
+The 12-factor wave and GoF wave both followed this model. The loop enforced continuity over many refactors without losing architectural intent.
 
 ## Why Validation Is Non-Negotiable
 The loop is only trustworthy when verification is objective. In this repo, recurring quality gates acted as completion checks:
@@ -53,11 +55,6 @@ Use this loop whenever work spans multiple files, concepts, or operational domai
 - **Execution sprawl**: doing many unrelated changes in one sprint.
 - **Evidence debt**: claiming completion without repeatable validation outputs.
 - **Context amnesia**: losing rationale because decisions stayed only in chat.
-
-## Repository Example
-- The `sprints/` workflow was executed as designed: plans moved from planning to active to completed with QA artifacts.
-- `sprints/completed/QA-AUDIT.md` and `sprints/completed/QA-AUDIT-12FACTOR.md` captured objective evidence after implementation waves.
-- The loop enforced continuity over many refactors without losing architectural intent.
 
 ## Exercise
 Take one active architectural concern and run a miniature loop:

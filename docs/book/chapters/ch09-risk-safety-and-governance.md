@@ -20,9 +20,15 @@ Unverified artifacts or ambiguous run stages can produce non-reproducible deploy
 Improper shutdown behavior or weak health signaling can cause cascading failure during deploy or scaling events.
 
 ### 4) Orchestration Drift Risk
-As prompts and process evolve, implicit assumptions diverge unless captured and validated.
+Orchestration drift is the most novel risk in AI-native systems and the least covered by traditional operations tooling.
 
-A mature governance model makes each domain observable and testable.
+It happens when prompt contracts, model behavior, and process assumptions evolve at different speeds. A prompt that assumed a particular response structure may silently break downstream validation after a model update. A changed model version may alter tool-selection behavior in ways that no existing test catches. A process improvement may invalidate assumptions that were hardcoded in earlier sprint artifacts.
+
+This risk is qualitatively different from the others: it is not caused by a missing key or a crashed process. It is caused by the gap between what the system expects and what the current model or configuration actually delivers — a gap that can grow undetected across many small changes.
+
+The control mechanism is the same as for software drift generally: explicit versioning, contract documentation, and activation-based validation that can be run on demand. In this repository, sprint artifacts and QA audit documents serve this role — they capture what the system expected at a given point and provide a baseline for detecting when those expectations no longer hold.
+
+A mature governance model makes each domain — including orchestration drift — observable and testable.
 
 ## Practical Lens
 Treat governance controls as first-class system components with explicit owners.

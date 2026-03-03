@@ -8,6 +8,8 @@ AI-native systems can feel novel, but they still fail for familiar reasons: dupl
 
 In orchestration-heavy systems, change is constant. Prompts evolve, providers evolve, and operational requirements evolve. The engineering question is not whether change happens; it is whether the codebase remains legible and safe while change happens.
 
+> For the story of who the Gang of Four were, what they were reacting to, and why their vocabulary still travels, see [Chapter 0](ch00-the-people-behind-the-principles.md).
+
 ## Pattern Set Applied in This Repository
 
 ### Observer
@@ -23,6 +25,18 @@ Provider error handling now flows through explicit handlers (model-not-found, tr
 Route lifecycle flow was centralized into a reusable algorithm and helper facade, reducing route duplication and standardizing response/error telemetry behavior.
 
 These patterns are not decorative. They reduce correction load and improve predictability.
+
+## What Changed: Before and After
+
+Patterns become concrete when you see what they replaced.
+
+**Before the Observer refactor**, every route that needed to emit metrics hardcoded its tracking logic inline. Adding a new metric destination required editing every route. After the refactor, routes call `publisher.emit(event)`. Adding a new metric consumer requires zero route changes — it registers a new listener.
+
+**Before the Chain of Responsibility refactor**, provider error handling was nested conditionals — model-not-found, transient timeout, and unknown errors handled by if/else blocks mixed into route code. After the refactor, errors flow through an explicit handler chain in `src/lib/chat/anthropic-client.ts`. Adding a new error case means adding one handler, not rewriting a conditional.
+
+**Before the Template Method + Facade refactor**, each route manually managed request correlation IDs, error envelope shapes, and telemetry emission. Two routes meant two maintenance burdens that could silently diverge. After the refactor, `src/lib/chat/http-facade.ts` owns that lifecycle. Routes became thin coordinators with a consistent contract.
+
+The test count did not change significantly after any of these refactors. The correction surface for every future change shrank substantially.
 
 ## Practical Lens
 Use patterns only when they reduce accidental complexity and sharpen module boundaries.

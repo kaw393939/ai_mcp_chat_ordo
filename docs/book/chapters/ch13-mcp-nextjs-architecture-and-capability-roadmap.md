@@ -9,6 +9,8 @@ At a practical level, MCP gives you a contract so model-driven tool use is expli
 
 MCP helps answer a core reliability question: when a model needs to act, how do we make that action deterministic, inspectable, and extensible?
 
+> For the background on Anthropic, the people who built MCP, and why the protocol was designed the way it was, see [Chapter 0](ch00-the-people-behind-the-principles.md).
+
 ## What This Project Is Doing with MCP
 In this repository, MCP is used to expose a calculator capability as a tool process (`mcp/calculator-server.ts`) while Next.js handles user-facing app and API orchestration.
 
@@ -19,6 +21,38 @@ Current architecture split:
 - **Operations layer** (`scripts/`, `docs/operations/`): validation, release controls, health/admin workflows.
 
 This separation keeps conversational reasoning in one domain and deterministic execution in another.
+
+## What the Tool Definition Looks Like
+
+Architecture explanations become concrete with code. Here is a simplified version of the calculator tool server from this repository:
+
+```typescript
+// mcp/calculator-server.ts (simplified)
+import { Server } from "@modelcontextprotocol/sdk/server/index.js";
+import { CallToolRequestSchema } from "@modelcontextprotocol/sdk/types.js";
+
+const server = new Server({ name: "calculator", version: "1.0.0" });
+
+server.setRequestHandler(CallToolRequestSchema, async (request) => {
+  const { name, arguments: args } = request.params;
+
+  if (name === "calculator") {
+    const { operation, a, b } = args as { operation: string; a: number; b: number };
+    const result = compute(operation, a, b); // pure function — no model involved
+    return { content: [{ type: "text", text: String(result) }] };
+  }
+
+  throw new Error(`Unknown tool: ${name}`);
+});
+```
+
+Three things to notice:
+
+1. **The schema is explicit.** The tool has a name, typed arguments (`operation`, `a`, `b`), and a defined return shape. The model cannot send malformed inputs without the handler rejecting them.
+2. **The execution is deterministic.** Once the model decides to call the tool, the computation is a pure function. No further model reasoning is involved in producing the result.
+3. **The boundary is enforced by the protocol.** The Next.js layer decides *when* a tool call is appropriate (policy). The MCP layer decides *how* to execute it (implementation). These two concerns are never mixed in the same module.
+
+This is the architectural value of the MCP + Next.js pairing: the model interacts with capabilities through a typed contract, and that contract is owned by the tool layer — not by the conversation layer.
 
 ## Why MCP + Next.js Is a Great Combo
 

@@ -49,6 +49,8 @@ This sequence mattered: each phase built on the guarantees produced by the previ
 ## Practical Lens
 Use this case study as a repeatable migration template: deliver capability, stabilize structure, harden operations, then optimize extensibility.
 
+> The audit-to-sprint loop that drove each phase is defined in [Chapter 5](ch05-audit-to-sprint-loop.md). The 12-factor and GoF principles applied in Phases 3 and 4 are covered in [Chapter 6](ch06-12-factor-in-the-llm-era.md) and [Chapter 7](ch07-gof-for-ai-native-systems.md).
+
 ## Evidence-Driven Outcomes
 The project’s maturity claims are backed by repository artifacts, not narrative assertion:
 
@@ -57,6 +59,18 @@ The project’s maturity claims are backed by repository artifacts, not narrativ
 - operational scripts under `scripts/`
 - architectural modules under `src/lib/`
 - repeated quality-gate execution through test/lint/build commands
+
+## What Went Wrong (And Why That Matters)
+
+No refactoring process is linear. Three specific things broke during this project's evolution, and those corrections are more instructive than the successes.
+
+**First: graceful shutdown was missing.** The initial streaming route had no logic for draining in-flight requests on process termination. The app worked in development. In any production deployment requiring zero-downtime restarts, it would have silently corrupted in-progress responses. This was caught by the 12-factor audit — not by any pre-existing test. It became the direct impetus for `scripts/start-server.mjs` and the explicit Disposability coverage in Chapter 6.
+
+**Second: the chat route became a monolith.** The API route handler grew to mix request validation, orchestration policy, provider invocation, and error handling in a single file. Each concern worked correctly in isolation, but changing any one of them required understanding all of them. The SOLID/SRP audit found this. The fix was decomposing into `validation.ts`, `policy.ts`, `orchestrator.ts`, and `http-facade.ts`. No behavior changed. The change surface shrank dramatically.
+
+**Third: a model alias broke without warning.** A model identifier changed between development testing and integration (`claude-haiku` → `claude-haiku-4-5`). The original code had no fallback mechanism and failed hard with an opaque API error. This revealed a simultaneous config management gap (Factor III) and dev/prod parity gap (Factor X). The fix — centralizing model config with fallback logic in `src/lib/config/env.ts` — addressed both.
+
+These failures are not embarrassments. They are the expected output of running structured audits against real systems. The process surfaces them in bounded, fixable form before production pressure makes them costly.
 
 ## Timeline Snapshot
 1. Baseline Next.js setup and validation.

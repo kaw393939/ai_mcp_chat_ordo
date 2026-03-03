@@ -122,6 +122,42 @@ The broader lesson of her story is about attribution and depth. Most engineers u
 
 ---
 
+## Tim Berners-Lee and the Architecture of the Open Web (1989–1991)
+
+**Tim Berners-Lee** was a software engineer at CERN in 1989 when he submitted a proposal titled *Information Management: A Proposal.* His manager wrote *"vague but exciting"* in the margin and did not reject it. That margin note is now a famous artefact because the proposal described, in outline, what became the World Wide Web.
+
+The problem he was solving was specific and unglamorous: CERN employed thousands of researchers who worked on different computers running different operating systems, and information was constantly being lost when people left. There was no way to link documents across machines, no shared addressing scheme, no protocol for retrieving something from a server you did not directly administer.
+
+His solution had three interlocking parts. **HTTP** — Hypertext Transfer Protocol — defined a stateless request-response model: a client sends a request, a server sends a response, and neither retains memory of the interaction. **HTML** — Hypertext Markup Language — defined a document format with links, making information navigable rather than siloed. **URLs** — Uniform Resource Locators — gave every document a universal address, independent of the server hosting it.
+
+The decision to make these specifications open and unpatented shaped the entire trajectory of software development. Berners-Lee explicitly chose not to charge royalties. The web became universal precisely because no single company owned the protocol. Every framework, every server, every application discussed in this book runs on the substrate he gifted to the world without restriction.
+
+The stateless request-response model he chose for HTTP was not inevitable — he could have designed a connection-oriented, stateful protocol. The choice of statelessness is the architectural property that Roy Fielding would later name and formalize as the key to the web's scalability. Every route handler in this repository processes an HTTP request and returns a response. That model traces directly to what Berners-Lee specified in a CERN document in 1989.
+
+**What frustrated him:** Information that disappeared when people left an organization because it lived in people's heads and local files rather than in an addressable, linkable system accessible from any machine.
+
+---
+
+## Guido van Rossum and the Readability Mandate (1991)
+
+**Guido van Rossum** started building Python during a Christmas holiday in 1989 and released it in 1991. He had been working on the ABC language at Centrum Wiskunde & Informatica in Amsterdam and found ABC both promising and frustrating: it had excellent ideas about teaching programming clearly, but it was too controlled and too closed. You could not extend it. You could not hook into the operating system. It was designed to be safe rather than useful.
+
+Python inherited ABC's emphasis on readability and inverted its closedness. The design philosophy Van Rossum encoded into the language is formalized in *The Zen of Python* — twenty aphorisms that describe the intended character of the language. The three most important:
+
+> *Readability counts.*
+> *Explicit is better than implicit.*
+> *There should be one obvious way to do it.*
+
+The structural expression of these principles is indentation-as-syntax: in Python, whitespace is not decorative, it is grammatical. A block of code is defined by its indentation level. This forces the visual structure of the code to match its logical structure. You cannot write deeply nested, visually ambiguous Python in the way you can in languages where layout and structure are decoupled. The legibility constraint is enforced by the parser.
+
+This connects directly to Dijkstra's argument that code is correct only if a person can verify that it is correct. Van Rossum operationalized that principle at the language level: Python programs are, by construction, easier to read than equivalent programs in languages where indentation is optional decoration.
+
+The relevance to AI-assisted development is significant. Python is the language of data science, machine learning, and most AI research tooling — including the foundations of the models that now assist software development. The Anthropic API, the toolchains used to evaluate LLM outputs, and most of the infrastructure behind the systems discussed in this book are either written in Python or expose Python interfaces. Van Rossum's readability mandate shaped the language that shaped the tools that shaped the field.
+
+**What frustrated him:** Programming languages that were powerful or safe but not both — and that required experts to read them because they had no commitment to making programs legible to the next person who would maintain them.
+
+---
+
 ## Ward Cunningham and the Debt Metaphor (1992)
 
 **Ward Cunningham** coined the term *technical debt* in 1992. He also invented the Wiki — the first one, in 1995, as part of the Portland Pattern Repository, a collaborative space for recording software patterns. The idea that became Wikipedia started as an engineering knowledge tool.
@@ -153,6 +189,22 @@ The book changed how teams talked about code. Before it, when you wanted to deco
 That compression — a name that carries a full design history — is exactly the idea this book explores in Chapter 4. The Gang of Four did not give us rules to follow blindly. They gave us a shared language so we could disagree intelligently.
 
 **What frustrated them:** Systems that solved the same structural problem in five different ways across the same codebase, with no shared vocabulary, no knowledge transfer, and no way for a new engineer to recognize that the problem had already been solved.
+
+---
+
+## Rasmus Lerdorf and the Accidental Language (1994)
+
+**Rasmus Lerdorf** did not intend to build a programming language. In 1994 he wrote a small set of Perl CGI scripts to track who was visiting his personal homepage on the web. He called them Personal Home Page Tools. They were not designed for reuse, extension, or elegance. They were designed to solve one problem. They worked.
+
+Other people asked to use them. He rewrote the system in C, added a form-handling library, and released it publicly. More people used it. Features were added. The language evolved continuously in response to demand rather than design. By the early 2000s PHP powered a substantial fraction of the web — WordPress, Wikipedia in its early years, and Facebook's first million users all ran on PHP.
+
+This is the book's sharpest example of accidental architecture at scale. PHP became the most widely deployed server-side language in the world without anyone deciding it should be a programming language. The consequences were visible in every codebase that outgrew its origins: inconsistent function naming, a standard library with no coherent design, global mutable state as a default, no encapsulation model in the early versions. The debt that Cunningham described as incurred through ignorance — shipping code you don't understand fully, in patterns you haven't learned yet, and hoping it works out — was effectively the founding philosophy of the language's first decade.
+
+The lesson is not that PHP was wrong to exist. The lesson is that *whatever ships becomes load-bearing*. Lerdorf built something that solved a real problem quickly. The industry adopted it faster than its design could mature. The result was a generation of developers learning from codebases that had graduated from scripts to applications without ever acquiring architecture. PHP's retrospective is the case for the principles in this book: the earlier you impose structure deliberately, the less expensive it is to maintain as the system grows.
+
+Lerdorf himself has been characteristically direct about this. He has said publicly that PHP was never supposed to be a general-purpose programming language, and that the fact that it became one is not something he takes unambiguous pride in. That honesty — naming the gap between intent and outcome — is the same disposition Hoare showed with null, Dahl showed with Node.js, and that this book asks you to bring to AI-generated code.
+
+**What frustrated him:** Nothing initially — he was solving his own specific problem. The frustration belongs to the engineers who later inherited large PHP codebases without having been present for the accidental decisions that shaped them.
 
 ---
 
@@ -233,6 +285,24 @@ Their second most recognized concept is the **broken windows theory** applied to
 They also introduced **tracer bullets** as a development philosophy: rather than building each layer completely before moving to the next, fire a thin slice all the way through the system end-to-end as early as possible. You learn more from a thin working path through real code than from a thick design that has never met a runtime. This is the same instinct that drives the sprint-archive model in Chapter 5 — ship a verified, bounded increment before the next begins.
 
 **What frustrated them:** The prevalence of passive engineering — programmers who waited for requirements to be defined, tools to be chosen, and problems to be assigned, rather than taking active ownership of the quality and direction of their work.
+
+---
+
+## Roy Fielding and the Architecture of the Web Itself (2000)
+
+**Roy Fielding** did not invent REST. He *named* it — and naming it changed everything.
+
+In 2000 he submitted his doctoral dissertation at UC Irvine: *Architectural Styles and the Design of Network-based Software Architectures.* Chapter 5 of that dissertation described **Representational State Transfer** — REST — as the architectural style that had made the World Wide Web scale. Fielding had been one of the principal authors of the HTTP/1.1 specification, so he was not theorizing about an abstract architecture. He was performing a retrospective on architecture that already existed and explaining *why it worked*.
+
+The constraints he identified: **statelessness** — each request contains all the information needed to process it; no server-side session state persists between requests. **Uniform interface** — resources identified by URIs, operated on with a small fixed set of methods (GET, POST, PUT, DELETE). **Layered system** — a client cannot tell whether it is communicating with the origin server or an intermediary, enabling caching and load-balancing to be added transparently. **Client-server separation** — UI and data storage are decoupled, allowing each to evolve independently.
+
+These constraints are not arbitrary. Each one was the solution to a specific scalability or evolvability failure that centralized, stateful, tightly coupled architectures exhibited. The web scaled to billions of users not despite statelessness but because of it: every server can answer any request without consulting session state, which makes horizontal scaling straightforward.
+
+The reason Fielding's dissertation is in this chapter is that virtually every API this book discusses — the Anthropic API, the MCP server interface, the Next.js route handlers — either follows REST conventions or explicitly departs from them for documented reasons. When a route handler reads from path parameters and returns JSON, it is practicing Fielding's uniform interface. When MCP uses a different model — typed tool invocations with explicit schemas rather than resource-oriented URLs — the departure from REST is deliberate: tools are actions, not resources, and the REST style was not designed for action-based interaction.
+
+His dissertation also contains one of the most useful definitions in software architecture: *"An architectural style is a coordinated set of architectural constraints that restricts the roles/features of architectural elements and the relationships allowed between those elements within any architecture that conforms to that style."* Constraints are not limitations. Constraints are what make systems predictable, scalable, and independently operable.
+
+**What frustrated him:** HTTP being misused in ways that violated the properties that made it scale — state embedded in servers, operations encoded in query strings, URL structures that exposed server implementation details rather than addressing resources uniformly.
 
 ---
 
@@ -372,7 +442,7 @@ The deterministic tools described in Chapter 9 — TypeScript strict mode, ESLin
 
 ## The Thread
 
-Span the timeline. Hoare in 1965. Dijkstra in 1968. Knuth in 1968. Brooks in 1975. Liskov in 1987. Cunningham in 1992. The Gang of Four in 1994. Beck, Fowler, Thomas and Hunt in the late 1990s. Martin through the 2000s. Torvalds and Git in 2005. Dahl and Node.js in 2009. Wiggins in 2011. Hejlsberg, Zakas, and Walke's React in 2012–2013. Rauch and Next.js in 2016. Clark and *Import AI* from 2016. Anthropic and MCP in 2023.
+Span the timeline. Hoare in 1965. Dijkstra in 1968. Knuth in 1968. Brooks in 1975. Liskov in 1987. Berners-Lee and the Web in 1989. Van Rossum and Python in 1991. Cunningham in 1992. The Gang of Four and Lerdorf's PHP in 1994. Beck, Fowler, Thomas and Hunt in the late 1990s. Fielding and REST in 2000. Martin through the 2000s. Torvalds and Git in 2005. Dahl and Node.js in 2009. Wiggins in 2011. Hejlsberg, Zakas, and Walke's React in 2012–2013. Rauch and Next.js in 2016. Clark and *Import AI* from 2016. Anthropic and MCP in 2023.
 
 Six decades of practitioners observing failures, building vocabulary, and handing it forward.
 

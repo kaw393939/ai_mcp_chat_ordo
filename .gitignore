@@ -46,3 +46,7 @@ lighthouse-report.json
 lighthouse-prod.json
 lighthouse-*.json
 .lighthouseci/
+
+# local research/reference files
+jack_clark.txt
+*.txt

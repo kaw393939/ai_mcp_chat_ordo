@@ -1,4 +1,4 @@
-# Chapter 4 - Named Frameworks as Compressed Programs
+# Chapter 4 — Named Frameworks as Compressed Programs
 
 ## Abstract
 Names like 12-Factor, GoF, and Uncle Bob are compressed packets of design intent. When invoked clearly, they align humans and models quickly and reduce orchestration ambiguity.

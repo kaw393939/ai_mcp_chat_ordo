@@ -1,4 +1,4 @@
-# Chapter 5 - The Audit-to-Sprint Execution Loop
+# Chapter 5 — The Audit-to-Sprint Execution Loop
 
 ## Abstract
 Reliable orchestration turns abstract critiques into concrete implementation cycles. This chapter presents the operating loop: audit findings, sprint plans, execution, verification, and archival.

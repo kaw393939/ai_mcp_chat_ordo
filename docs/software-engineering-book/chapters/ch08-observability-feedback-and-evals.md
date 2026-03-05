@@ -1,4 +1,4 @@
-# Chapter 8 - Observability, Feedback, and Evals
+# Chapter 8 — Observability, Feedback, and Evals
 
 ## Abstract
 Without feedback loops, orchestration quality decays silently. This chapter defines how to instrument behavior and convert runtime signals into iterative improvements.

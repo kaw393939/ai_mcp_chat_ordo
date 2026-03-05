@@ -1,4 +1,4 @@
-# Chapter 1 - Why This Moment Matters
+# Chapter 1 — Why This Moment Matters
 
 ## Abstract
 LLM systems change how software is specified and built: intent can be expressed in natural language and executed through structured orchestration loops. This chapter defines the core thesis of the book: language is now part of the implementation surface.

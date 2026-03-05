@@ -1,4 +1,4 @@
-# Chapter 2 - A Brief History of Control Surfaces
+# Chapter 2 — A Brief History of Control Surfaces
 
 ## Abstract
 Programming moved from machine instructions to abstractions that encode more intent per symbol. Natural language orchestration is the latest layer in that trajectory, not an exception to it.

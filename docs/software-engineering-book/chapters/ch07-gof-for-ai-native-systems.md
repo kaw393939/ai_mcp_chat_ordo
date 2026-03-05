@@ -1,4 +1,4 @@
-# Chapter 7 - GoF Patterns for AI-Native Systems
+# Chapter 7 — GoF Patterns for AI-Native Systems
 
 ## Abstract
 Classical patterns still matter in LLM systems, especially where orchestration complexity grows. This chapter shows how GoF patterns increase composability and reduce route-level fragility.
@@ -34,6 +34,9 @@ This principle — the L in SOLID — is the foundation of testable architecture
 Knuth gave us the precision ethic: measure before you optimize, and never sacrifice correctness for cleverness. Liskov gave us the substitution principle that makes GoF patterns safe to apply. Without substitutability, patterns are indirection without guarantees. With it, they are composable structure.
 
 ## Why GoF Still Works Here
+AI-native systems can feel novel, but they still fail for familiar reasons: duplication, implicit coupling, unclear boundaries, and mixed concerns in route handlers. GoF patterns remain useful because they manage structure under change.
+
+In orchestration-heavy systems, change is constant. Prompts evolve, providers evolve, and operational requirements evolve. The engineering question is not whether change happens; it is whether the codebase remains legible and safe while change happens.
 
 ## Pattern Set Applied in This Repository
 

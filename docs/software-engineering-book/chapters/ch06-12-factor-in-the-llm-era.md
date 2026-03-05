@@ -1,4 +1,4 @@
-# Chapter 6 - 12-Factor in the LLM Era
+# Chapter 6 — 12-Factor in the LLM Era
 
 ## Abstract
 12-Factor remains a strong backbone for modern systems, including AI-backed apps. This chapter translates each factor into concrete practices for LLM routes, provider integrations, and operational scripts.
@@ -36,6 +36,7 @@ Lerdorf himself has said publicly that PHP was never supposed to be a general-pu
 Wiggins distilled what makes applications operable. Lerdorf's story is the cautionary tale of what happens without those principles. Together, they frame why 12-Factor still matters — especially in the LLM era, where the same failure modes appear in new forms.
 
 ## Why 12-Factor Still Matters
+LLM-enabled apps are still apps. They still fail in predictable ways: configuration drift, release inconsistency, weak observability, fragile shutdown behavior, and unclear operational ownership. 12-Factor remains relevant because it defines operationally durable defaults. In AI-backed systems, these defaults become more important, not less.
 
 ### Codebase (I)
 One codebase tracked in version control, many deploys. LLM applications often proliferate experimental forks that diverge silently. Treat model-specific configurations, prompt contracts, and tool schemas as code — not as ad-hoc customizations outside the repository.

@@ -1,4 +1,4 @@
-# Chapter 13 - MCP + Next.js: Architecture and Capability Roadmap
+# Chapter 13 — MCP + Next.js: Architecture and Capability Roadmap
 
 ## Abstract
 This chapter explains what MCP is, how it works in this project, why pairing MCP with Next.js creates high leverage, and which capabilities should be added next for maximum audience and product value.
@@ -60,6 +60,9 @@ Jack Clark was the guest in that conversation. He named the failure mode that tr
 This project sits at that transition. The chat interface and MCP calculator in this repository are not just a demo — they are the minimal architecture that makes the shift from talking to doing legible.
 
 ## What MCP Is
+Model Context Protocol (MCP) is a standard interface for exposing tools and resources to models. At a practical level, MCP gives you a contract so model-driven tool use is explicit, typed, and interoperable.
+
+MCP helps answer a core reliability question: when a model needs to act, how do we make that action deterministic, inspectable, and extensible?
 
 ## What This Project Is Doing with MCP
 In this repository, MCP is used to expose a calculator capability as a tool process (`mcp/calculator-server.ts`) while Next.js handles user-facing app and API orchestration.

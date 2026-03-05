@@ -1,4 +1,4 @@
-# Chapter 11 - Team Operating Model
+# Chapter 11 — Team Operating Model
 
 ## Abstract
 Language orchestration scales best with shared rituals and explicit ownership. This chapter defines how teams can coordinate effectively around AI-assisted engineering.

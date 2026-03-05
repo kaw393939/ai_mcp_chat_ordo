@@ -1,4 +1,4 @@
-# Chapter 3 - Prompt Orchestration Primitives
+# Chapter 3 — Prompt Orchestration Primitives
 
 ## Abstract
 This chapter defines reusable primitives for controlling LLM behavior: role framing, constraints, acceptance criteria, decomposition, and feedback. These primitives make prompts composable and testable.

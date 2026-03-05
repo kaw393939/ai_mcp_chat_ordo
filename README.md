@@ -1,12 +1,12 @@
-# Language as Executable Architecture
+# The Product Development Library
 
 <div align="center">
 
 ![Book Cover — Language as Executable Architecture](docs/software-engineering-book/cover-language-as-architecture.png)
 
-**A book on professional software engineering in the AI era — with a working codebase that proves every claim.**
+**A 10-book series on professional product development in the AI era — with a working codebase that proves every claim.**
 
-[Read the Chapters](#book-i--ai-orchestration-engineering) · [Try the Prompts](#-prompt-companions) · [Run the Code](#getting-started) · [Read the Model's Preface](docs/software-engineering-book/PREFACE-FROM-THE-MODEL.md)
+[Browse the Books](#the-series) · [Try the Prompts](#-prompt-companions) · [Run the Code](#getting-started) · [Read the Model's Preface](docs/software-engineering-book/PREFACE-FROM-THE-MODEL.md)
 
 </div>
 
@@ -14,11 +14,11 @@
 
 ## The Thesis
 
-There is a layer of software engineering that separates engineers who write code from engineers who build systems that last. It is not about syntax or algorithms. It is about design discipline, operational thinking, and architectural judgment — the craft that determines whether a system stays maintainable under change, team growth, and production pressure.
+Intelligence is concentrated energy. When you give an AI vague direction, you get vague output. When you give it precise constraints — named frameworks, explicit scope, testable acceptance criteria — the probability distribution narrows and the output sharpens. The same principle applies to human teams: shared vocabulary, documented principles, and proven patterns amplify capability.
 
-AI makes this layer more visible and more urgent. Engineers who have developed craft use AI as a force multiplier. Engineers who haven't generate code faster without being able to tell whether it will survive contact with reality.
+This series applies that thesis across the full product development lifecycle: from software engineering through design, UX, product management, accessibility, entrepreneurship, marketing, content strategy, and data analytics. Each book grounds its principles in practitioner stories—the people who built the vocabulary we use today.
 
-This repository is both the book and the proof: a **production-grade Next.js + MCP application** built and refactored using every principle described in the text, with 23 sprint archives, 14 prompt companion documents containing 71 prompt pairs, and a composite quality gate you can run yourself.
+This repository is both the library and the proof: a **production-grade Next.js + MCP application** built using the principles described in the texts.
 
 ## Quality Baseline
 
@@ -62,84 +62,89 @@ docker compose up --build
 ## What's in This Repository
 
 ```
-├── docs/software-engineering-book/
-│   ├── PREFACE-FROM-THE-MODEL.md     ← The AI breaks the fourth wall
-│   ├── chapters/                      ← 14 engineering chapters
-│   ├── prompts/                       ← 14 prompt companions (71 prompt pairs)
-│   └── editorial/                     ← 15 editorial review documents
-├── docs/design-book/
-│   ├── chapters/                      ← 7 design history chapters
-│   ├── design-editorial/             ← 7 design chapter editorial reviews
-│   └── research/                      ← Design history reference images
-├── src/                               ← Next.js application (Claude chat + MCP tools)
-├── mcp/                               ← MCP tool servers (calculator, typed schemas)
-├── scripts/                           ← 10 operational scripts (health, secrets, release)
-├── sprints/completed/                 ← 23 archived sprint artifacts with evidence
-├── tests/                             ← 67 tests across unit, integration, policy
-└── docs/operations/                   ← Runbooks, environment matrix, process model
+├── docs/
+│   ├── software-engineering-book/   ← Book I: 14 chapters + 14 prompt companions + editorial
+│   ├── design-book/                 ← Book II: 10 chapters on design history
+│   ├── ui-design-book/              ← Book III: 10 chapters on UI engineering
+│   ├── ux-design-book/              ← Book IV: 10 chapters on UX design
+│   ├── product-management-book/     ← Book V: 10 chapters on product management
+│   ├── accessibility-book/          ← Book VI: 10 chapters on accessibility
+│   ├── entrepreneurship-book/       ← Book VII: 10 chapters on entrepreneurship
+│   ├── marketing-branding-book/     ← Book VIII: 10 chapters on marketing & branding
+│   ├── content-strategy-book/       ← Book IX: 10 chapters on content strategy
+│   ├── data-analytics-book/         ← Book X: 10 chapters on data & analytics
+│   ├── operations/                  ← Runbooks, environment matrix, process model
+│   └── _planning/                   ← Series architecture & book plans (internal)
+├── src/                             ← Next.js application (Claude chat + MCP tools)
+├── mcp/                             ← MCP tool servers (calculator, typed schemas)
+├── scripts/                         ← 10 operational scripts (health, secrets, release)
+├── sprints/completed/               ← 23 archived sprint artifacts with evidence
+└── tests/                           ← 67 tests across unit, integration, policy
 ```
 
 ---
 
-## Book I — AI Orchestration Engineering
+## The Series
+
+Ten books covering the full product development lifecycle. Each chapter follows the same convention: **Practitioner Story → Principle → Engineering Connection → Repository Example → Checklist.** Every Book's Chapter 9 connects its discipline to AI and the intelligence concentration thesis.
+
+### Book I — Software Engineering
 
 Fourteen chapters developing engineering judgment through the human stories behind six decades of foundational frameworks, applied to this codebase with verifiable evidence.
 
-> **How to read:** Each chapter links to its text and its prompt companion. Read the chapter for the principle, then use the prompt companion to practice it — each contains good/bad prompt pairs with candid "behind the curtain" commentary from the model explaining what it actually does with each prompt.
+> **How to read:** Each chapter links to its text and its prompt companion. Read the chapter for the principle, then use the prompt companion to practice it — each contains good/bad prompt pairs with candid "behind the curtain" commentary from the model.
 
 | # | Chapter | Prompt Companion |
 |---|---------|-----------------|
 | 0 | [The People Behind the Principles](docs/software-engineering-book/chapters/ch00-the-people-behind-the-principles.md) | [5 prompts](docs/software-engineering-book/prompts/ch00-prompts-the-people-behind-the-principles.md) |
-|   | *Hoare, Dijkstra, Knuth, Brooks, Liskov, Berners-Lee, Van Rossum, Cunningham, the GoF, Lerdorf, Beck, Fowler, Thomas & Hunt, Fielding, Martin, Wiggins, Hejlsberg, Zakas, Dahl, Walke, Rauch, Torvalds, Clark, and the Anthropic team.* | |
+|   | *Hoare, Dijkstra, Knuth, Brooks, Liskov, Berners-Lee, and more.* | |
 | 1 | [Why This Moment Matters](docs/software-engineering-book/chapters/ch01-why-this-moment-matters.md) | [4 prompts](docs/software-engineering-book/prompts/ch01-prompts-why-this-moment-matters.md) |
-|   | *AI does not eliminate the craft layer — it makes the gap wider, faster.* | |
 | 2 | [A Brief History of Control Surfaces](docs/software-engineering-book/chapters/ch02-history-of-control-surfaces.md) | [4 prompts](docs/software-engineering-book/prompts/ch02-prompts-history-of-control-surfaces.md) |
-|   | *Machine code → assembly → high-level languages → natural-language orchestration. Same failure modes, higher abstraction.* | |
 | 3 | [Prompt Orchestration Primitives](docs/software-engineering-book/chapters/ch03-prompt-orchestration-primitives.md) | [7 prompts](docs/software-engineering-book/prompts/ch03-prompts-orchestration-primitives.md) |
-|   | *Role framing, scope, invariants, acceptance criteria, sequencing, verification, artifact discipline.* | |
 | 4 | [Named Frameworks as Compressed Programs](docs/software-engineering-book/chapters/ch04-named-frameworks-as-compressed-programs.md) | [5 prompts](docs/software-engineering-book/prompts/ch04-prompts-named-frameworks-as-compressed-programs.md) |
-|   | *When you say "12-Factor" or "SOLID" to a model, you are loading a compressed program built by practitioners over decades.* | |
 | 5 | [The Audit-to-Sprint Execution Loop](docs/software-engineering-book/chapters/ch05-audit-to-sprint-loop.md) | [7 prompts](docs/software-engineering-book/prompts/ch05-prompts-audit-to-sprint-loop.md) |
-|   | *Phase Zero inquiry → audit → plan → execute → verify → archive. The method behind this entire project.* | |
 | 6 | [12-Factor in the LLM Era](docs/software-engineering-book/chapters/ch06-12-factor-in-the-llm-era.md) | [5 prompts](docs/software-engineering-book/prompts/ch06-prompts-12-factor-in-the-llm-era.md) |
-|   | *Wiggins's twelve factors reinterpreted for LLM-backed applications: config, disposability, parity, and beyond.* | |
 | 7 | [GoF Patterns for AI-Native Systems](docs/software-engineering-book/chapters/ch07-gof-for-ai-native-systems.md) | [5 prompts](docs/software-engineering-book/prompts/ch07-prompts-gof-for-ai-native-systems.md) |
-|   | *Observer, Decorator, Chain of Responsibility, Template Method, Facade — applied to the actual code in this repository.* | |
 | 8 | [Observability, Feedback, and Evals](docs/software-engineering-book/chapters/ch08-observability-feedback-and-evals.md) | [5 prompts](docs/software-engineering-book/prompts/ch08-prompts-observability-feedback-evals.md) |
-|   | *Request IDs, structured events, error taxonomy, and evaluation loops as engineering primitives.* | |
 | 9 | [Risk, Safety, and Operational Governance](docs/software-engineering-book/chapters/ch09-risk-safety-and-governance.md) | [5 prompts](docs/software-engineering-book/prompts/ch09-prompts-risk-safety-governance.md) |
-|   | *TypeScript strict + ESLint zero-warnings + Lighthouse thresholds = the composite quality gate for AI-generated code velocity.* | |
 | 10 | [Case Study: IS601 Demo](docs/software-engineering-book/chapters/ch10-case-study-is601-demo.md) | [5 prompts](docs/software-engineering-book/prompts/ch10-prompts-case-study-is601-demo.md) |
-|   | *This repository's full arc: scaffold → production-grade architecture. Every decision preserved and traceable.* | |
 | 11 | [Team Operating Model](docs/software-engineering-book/chapters/ch11-team-operating-model.md) | [5 prompts](docs/software-engineering-book/prompts/ch11-prompts-team-operating-model.md) |
-|   | *Role separation, handoff contracts, and the CEO operating model — build expert-grade systems in domains you don't personally master.* | |
 | 12 | [Future Directions](docs/software-engineering-book/chapters/ch12-future-directions.md) | [4 prompts](docs/software-engineering-book/prompts/ch12-prompts-future-directions.md) |
-|   | *Language-native tooling, continuous verification loops, and what the field looks like when AI writes the majority of code.* | |
 | 13 | [MCP + Next.js: Architecture and Capability Roadmap](docs/software-engineering-book/chapters/ch13-mcp-nextjs-architecture-and-capability-roadmap.md) | [5 prompts](docs/software-engineering-book/prompts/ch13-prompts-mcp-nextjs-architecture.md) |
-|   | *The protocol that makes AI systems doers rather than talkers. Typed schemas, deterministic execution, capability tiers.* | |
 
 ---
 
-## Book II — Design History as Engineering Lineage
+### Book II — Design History
 
-Seven chapters tracing the visual design decisions that shaped modern interfaces — from De Stijl's mathematical grids to fluid CSS calculus. Understanding why screens look the way they do prevents building interfaces that fight their own medium.
+Ten chapters tracing the visual design decisions that shaped modern interfaces — from De Stijl's mathematical grids to fluid CSS calculus.
 
 | # | Chapter |
 |---|---------|
-| 0 | [Before the Bauhaus: The People Who Mathematized Art](docs/design-book/chapters/ch00-before-the-bauhaus.md) |
-|   | *De Stijl, Constructivism, and the invisible foundation of computational design.* |
-| 1 | [The Bauhaus Experiment: Typography as Infrastructure](docs/design-book/chapters/ch01-bauhaus-and-the-machine.md) |
-|   | *Gropius, Bayer, and how stripping typographic ornamentation created universal standards.* |
-| 2 | [The Swiss Grid: Spatial Rhythm and Mathematics](docs/design-book/chapters/ch02-the-swiss-grid.md) |
-|   | *Müller-Brockmann turned layout into pure mathematical rhythm — the logical foundation of responsive web design.* |
-| 3 | [Postmodernism and Rebellion: Why We Break the Grid](docs/design-book/chapters/ch03-postmodernism-and-rebellion.md) |
-|   | *Carson, Scher, and the proof that rules must be understood before they can be effectively broken.* |
-| 4 | [The Digital Transition: Translating Physics to Pixels](docs/design-book/chapters/ch04-the-digital-transition.md) |
-|   | *Susan Kare's 16×16 pixel icons established the rules of visual affordance and digital wayfinding.* |
-| 5 | [Skeuomorphism to Flat Design: Reducing the Noise](docs/design-book/chapters/ch05-skeuomorphism-to-flat-design.md) |
-|   | *Why photorealistic UI died, how flat design replaced it, and Material Design's z-axis physics engine.* |
-| 6 | [The Motion and Fluid Web Era: Design as a Calculus](docs/design-book/chapters/ch06-the-motion-and-fluid-era.md) |
-|   | *`clamp()`, finite state machines, fluid scaling — modern design is a live equation solving for infinite viewports.* |
+| 0 | [Before the Bauhaus — The People Who Mathematized Art](docs/design-book/chapters/ch00-before-the-bauhaus.md) |
+| 1 | [The Bauhaus Experiment — Typography as Infrastructure](docs/design-book/chapters/ch01-bauhaus-and-the-machine.md) |
+| 2 | [The Swiss Grid — Spatial Rhythm and Mathematics](docs/design-book/chapters/ch02-the-swiss-grid.md) |
+| 3 | [Postmodernism and Rebellion — Why We Break the Grid](docs/design-book/chapters/ch03-postmodernism-and-rebellion.md) |
+| 4 | [The Digital Transition — Translating Physics to Pixels](docs/design-book/chapters/ch04-the-digital-transition.md) |
+| 5 | [Skeuomorphism to Flat Design — Reducing the Noise](docs/design-book/chapters/ch05-skeuomorphism-to-flat-design.md) |
+| 6 | [The Motion and Fluid Web Era — Design as a Calculus](docs/design-book/chapters/ch06-the-motion-and-fluid-era.md) |
+| 7 | [Color Theory — From Newton to OKLCH](docs/design-book/chapters/ch07-color-theory.md) |
+| 8 | [Typography — From Gutenberg to Variable Fonts](docs/design-book/chapters/ch08-typography.md) |
+| 9 | [Industrial Design — From Loewy to Rams](docs/design-book/chapters/ch09-industrial-design.md) |
+
+---
+
+### Books III–X
+
+| Book | Topic | Chapters | Key Practitioners |
+|------|-------|:--------:|-------------------|
+| **III** | [UI Design](docs/ui-design-book/chapters/) | 10 | Engelbart, Raskin, Tesler, Shneiderman, Tufte, Frost, Norman, Krug |
+| **IV** | [UX Design](docs/ux-design-book/chapters/) | 10 | Nielsen, Hall, Miller, Kahneman, Cooper, Christensen, Torres |
+| **V** | [Product Management](docs/product-management-book/chapters/) | 10 | Cagan, Porter, Dunford, Ries, Doerr, Ramanujam, Bush |
+| **VI** | [Accessibility](docs/accessibility-book/chapters/) | 10 | Ed Roberts, Kat Holmes, Léonie Watson |
+| **VII** | [Entrepreneurship](docs/entrepreneurship-book/chapters/) | 10 | Graham, Thiel, Blank, Fitzpatrick, Osterwalder |
+| **VIII** | [Marketing & Branding](docs/marketing-branding-book/chapters/) | 10 | Ries & Trout, Pulizzi, Miller (StoryBrand) |
+| **IX** | [Content Strategy](docs/content-strategy-book/chapters/) | 10 | Halvorson, Mailchimp Style Guide |
+| **X** | [Data & Analytics](docs/data-analytics-book/chapters/) | 10 | Kaushik, Tufte |
 
 ---
 
@@ -150,8 +155,6 @@ Seven chapters tracing the visual design decisions that shaped modern interfaces
 > *"When your context window contains vague intent, broad scope, and no acceptance criteria, the most probable output is generic, plausible, and often subtly wrong. When it contains a named framework, explicit scope boundaries, clear invariants, and testable acceptance criteria, the probability distribution narrows dramatically. The difference is not magic. It is math."*
 >
 > — [Preface from the Model](docs/software-engineering-book/PREFACE-FROM-THE-MODEL.md)
-
-Start with any chapter's companion that matches your current work:
 
 | If you are... | Start here |
 |---|---|
@@ -169,15 +172,11 @@ Start with any chapter's companion that matches your current work:
 
 ![MCP Architecture — Three-Layer Split](docs/software-engineering-book/mcp-architecture-diagram.png)
 
-The architectural principle from [Chapter 13](docs/software-engineering-book/chapters/ch13-mcp-nextjs-architecture-and-capability-roadmap.md):
-
 | Layer | Responsibility | Location |
 |---|---|---|
 | **Next.js** | UI, API routes, orchestration policy, provider wiring | `src/` |
 | **MCP Protocol** | Typed tool schemas, deterministic execution contracts | `mcp/` |
 | **Operations** | Health, secrets, release integrity, admin workflows | `scripts/` |
-
-The model reasons. The MCP tool executes. The Next.js layer orchestrates. This separation makes every action inspectable and every failure attributable to a specific domain.
 
 ---
 
@@ -191,8 +190,6 @@ This project's evolution is fully documented across **23 sprint artifacts** in [
 | **Structural Cleanup** | 04–07 | SRP refactor, streaming hardening, UI hook separation, type safety |
 | **12-Factor Hardening** | 12f-01–09 | Config/secrets, backing services, build/release/run, disposability, parity, logs, admin |
 | **GoF Extensibility** | gof-01–02 | Observer + Decorator + Chain of Responsibility, Template Method + Facade |
-
-Each sprint artifact contains: scope, invariants, acceptance criteria, validation commands, and execution evidence.
 
 ---
 
@@ -220,10 +217,10 @@ See [`docs/operations/`](docs/operations/) for runbooks, environment matrix, and
 | Model preface (fourth wall) | [`PREFACE-FROM-THE-MODEL.md`](docs/software-engineering-book/PREFACE-FROM-THE-MODEL.md) |
 | Book QA report | [`BOOK-QA.md`](docs/software-engineering-book/BOOK-QA.md) |
 | Audience value audit | [`BOOK-AUDIENCE-AUDIT.md`](docs/software-engineering-book/BOOK-AUDIENCE-AUDIT.md) |
-| Editorial reviews (14 chapters) | [`docs/software-engineering-book/editorial/`](docs/software-engineering-book/editorial/) |
-| Design editorial reviews (7 chapters) | [`docs/design-book/design-editorial/`](docs/design-book/design-editorial/) |
+| Editorial — Book I (14 chapters) | [`docs/software-engineering-book/editorial/`](docs/software-engineering-book/editorial/) |
+| Editorial — Book II (10 chapters) | [`docs/design-book/editorial/`](docs/design-book/editorial/) |
 | Design research images | [`docs/design-book/research/`](docs/design-book/research/) |
+| Series architecture & plans | [`docs/_planning/`](docs/_planning/) |
 | Operations runbooks | [`docs/operations/`](docs/operations/) |
 | Sprint archive (23 sprints) | [`sprints/completed/`](sprints/completed/) |
 | Runtime scripts (10) | [`scripts/`](scripts/) |
-

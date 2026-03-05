@@ -1,4 +1,4 @@
-# Chapter 9 - Risk, Safety, and Operational Governance
+# Chapter 9 — Risk, Safety, and Operational Governance
 
 ## Abstract
 High-velocity orchestration requires strong guardrails. This chapter covers practical governance: secrets, failure domains, safety checks, and deployment discipline.

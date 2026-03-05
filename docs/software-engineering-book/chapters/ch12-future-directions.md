@@ -1,4 +1,4 @@
-# Chapter 12 - Future Directions
+# Chapter 12 — Future Directions
 
 ## Abstract
 The future of software engineering is likely language-native and continuously verified. This chapter outlines probable next steps for orchestration tooling, methods, and team practices.

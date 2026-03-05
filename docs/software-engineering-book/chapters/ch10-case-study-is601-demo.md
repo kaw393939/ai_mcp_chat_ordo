@@ -1,4 +1,4 @@
-# Chapter 10 - Case Study: IS601 Demo
+# Chapter 10 — Case Study: IS601 Demo
 
 ## Abstract
 This chapter narrates the transformation of this repository from baseline scaffold to a pattern-driven, operationally mature AI application.

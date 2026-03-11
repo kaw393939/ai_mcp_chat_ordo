@@ -1,6 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
-import { SYSTEM_PROMPT, getModelCandidates } from "@/lib/chat/policy";
-import { ALL_TOOLS, createToolResults } from "@/lib/chat/tools";
+import { getModelCandidates } from "@/lib/chat/policy";
+import { createToolResults } from "@/lib/chat/tools";
+import type { RoleName } from "@/core/entities/user";
 
 export interface StreamCallbacks {
   onDelta?: (text: string) => void;
@@ -14,12 +15,18 @@ export async function runClaudeAgentLoopStream({
   callbacks,
   maxToolRounds = 4,
   signal,
+  systemPrompt,
+  tools,
+  role,
 }: {
   apiKey: string;
   messages: Anthropic.MessageParam[];
   callbacks: StreamCallbacks;
   maxToolRounds?: number;
   signal?: AbortSignal;
+  systemPrompt: string;
+  tools: Anthropic.Tool[];
+  role?: RoleName;
 }): Promise<void> {
   const models = getModelCandidates();
   const model = models[0]; // fallback, but ideally we check candidates
@@ -31,7 +38,7 @@ export async function runClaudeAgentLoopStream({
 
   const client = new Anthropic({ apiKey });
 
-  const anthropicTools: Anthropic.Tool[] = ALL_TOOLS.map((t) => ({
+  const anthropicTools: Anthropic.Tool[] = tools.map((t) => ({
     name: t.name,
     description: t.description || "",
     input_schema: t.input_schema || { type: "object", properties: {} },
@@ -49,7 +56,7 @@ export async function runClaudeAgentLoopStream({
       {
         model,
         max_tokens: 2048,
-        system: SYSTEM_PROMPT,
+        system: systemPrompt,
         messages: conversation,
         tools: anthropicTools,
       },
@@ -80,7 +87,7 @@ export async function runClaudeAgentLoopStream({
 
     // Execute tools and collect results
     // We execute them sequentially to capture output, or we can use the existing createToolResults
-    const generatedResults = await createToolResults(toolUseBlocks);
+    const generatedResults = await createToolResults(toolUseBlocks, role);
 
     // Fire callbacks and format results
     for (let i = 0; i < toolUseBlocks.length; i++) {

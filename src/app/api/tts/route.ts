@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { getSessionUser } from "@/lib/auth";
 
 // --- ElevenLabs (disabled — uncomment to re-enable as primary provider) ---
 // const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY ?? "";
@@ -6,6 +7,14 @@ import { NextResponse } from "next/server";
 
 export async function POST(req: Request) {
   try {
+    const user = await getSessionUser();
+    if (user.roles[0] === "ANONYMOUS") {
+      return NextResponse.json(
+        { error: "Audio generation requires authentication" },
+        { status: 403 },
+      );
+    }
+
     const body = await req.json();
     const { text } = body;
 

@@ -1,7 +1,7 @@
 import Anthropic from "@anthropic-ai/sdk";
 import type { NextRequest } from "next/server";
 import { getAnthropicApiKey } from "@/lib/config/env";
-import { looksLikeMath } from "@/lib/chat/policy";
+import { looksLikeMath, buildSystemPrompt } from "@/lib/chat/policy";
 import { orchestrateChatTurn } from "@/lib/chat/orchestrator";
 import {
   getLatestUserMessage,
@@ -15,6 +15,9 @@ import {
 } from "@/lib/chat/provider-decorators";
 import { runRouteTemplate, successJson } from "@/lib/chat/http-facade";
 import { logEvent } from "@/lib/observability/logger";
+import { getToolsForRole } from "@/lib/chat/tools";
+import { getSessionUser } from "@/lib/auth";
+import type { RoleName } from "@/core/entities/user";
 
 export async function POST(request: NextRequest) {
   return runRouteTemplate({
@@ -27,9 +30,16 @@ export async function POST(request: NextRequest) {
       const apiKey = getAnthropicApiKey();
       const conversation = toAnthropicMessages(incomingMessages);
 
+      const user = await getSessionUser();
+      const role = user.roles[0] as RoleName;
+      const systemPrompt = await buildSystemPrompt(role);
+      const tools = getToolsForRole(role);
+
       const client = new Anthropic({ apiKey });
       const provider = withProviderTiming(
-        withProviderErrorMapping(createAnthropicProvider(client)),
+        withProviderErrorMapping(
+          createAnthropicProvider(client, { systemPrompt, tools }),
+        ),
         ({ durationMs, isError }) => {
           logEvent("info", "provider.call", {
             route: context.route,
@@ -52,6 +62,7 @@ export async function POST(request: NextRequest) {
         provider,
         conversation,
         toolChoice,
+        role,
       });
 
       return successJson(context, { reply });

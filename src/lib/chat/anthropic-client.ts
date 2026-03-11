@@ -1,11 +1,14 @@
 import type Anthropic from "@anthropic-ai/sdk";
-import { SYSTEM_PROMPT, getModelCandidates } from "@/lib/chat/policy";
-import { ALL_TOOLS } from "@/lib/chat/tools";
+import { getModelCandidates } from "@/lib/chat/policy";
 import type { ToolChoice } from "@/lib/chat/types";
 import { ChatProviderError } from "@/lib/chat/provider-decorators";
 
-type MessageCreateParams = Parameters<Anthropic["messages"]["create"]>[0];
-const CHAT_TOOLS: NonNullable<MessageCreateParams["tools"]> = ALL_TOOLS;
+export type ChatProvider = {
+  createMessage(args: {
+    messages: Anthropic.MessageParam[];
+    toolChoice: ToolChoice;
+  }): Promise<Anthropic.Message>;
+};
 
 const DEFAULT_TIMEOUT_MS = 12_000;
 const DEFAULT_RETRY_ATTEMPTS = 3;
@@ -15,13 +18,6 @@ export type AnthropicResilienceOptions = {
   timeoutMs?: number;
   retryAttempts?: number;
   retryDelayMs?: number;
-};
-
-export type ChatProvider = {
-  createMessage(args: {
-    messages: Anthropic.MessageParam[];
-    toolChoice: ToolChoice;
-  }): Promise<Anthropic.Message>;
 };
 
 type ErrorHandlingContext = {
@@ -137,11 +133,15 @@ export async function createMessageWithModelFallback({
   messages,
   toolChoice,
   options,
+  systemPrompt,
+  tools,
 }: {
   client: Anthropic;
   messages: Anthropic.MessageParam[];
   toolChoice: ToolChoice;
   options?: AnthropicResilienceOptions;
+  systemPrompt: string;
+  tools: Anthropic.Tool[];
 }): Promise<Anthropic.Message> {
   const models = getModelCandidates();
   let lastError: unknown;
@@ -156,9 +156,9 @@ export async function createMessageWithModelFallback({
           client.messages.create({
             model,
             max_tokens: 2048,
-            system: SYSTEM_PROMPT,
+            system: systemPrompt,
             messages,
-            tools: CHAT_TOOLS,
+            tools,
             tool_choice: toolChoice,
           }),
           timeoutMs,
@@ -198,7 +198,11 @@ export async function createMessageWithModelFallback({
 
 export function createAnthropicProvider(
   client: Anthropic,
-  options?: AnthropicResilienceOptions,
+  config: {
+    systemPrompt: string;
+    tools: Anthropic.Tool[];
+    resilience?: AnthropicResilienceOptions;
+  },
 ): ChatProvider {
   return {
     createMessage: ({ messages, toolChoice }) =>
@@ -206,7 +210,9 @@ export function createAnthropicProvider(
         client,
         messages,
         toolChoice,
-        options,
+        options: config.resilience,
+        systemPrompt: config.systemPrompt,
+        tools: config.tools,
       }),
   };
 }

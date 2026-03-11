@@ -15,6 +15,8 @@ import {
 } from "@/core/use-cases/tools/UiTools";
 import { CalculatorCommand } from "@/core/use-cases/tools/CalculatorTool";
 import { getBookRepository } from "@/adapters/RepositoryFactory";
+import { getToolNamesForRole } from "@/core/use-cases/ToolAccessPolicy";
+import type { RoleName } from "@/core/entities/user";
 
 // ---- Tool Definitions (Anthropic SDK Schema) ----
 
@@ -171,6 +173,12 @@ export const ALL_TOOLS: Anthropic.Tool[] = [
   ADJUST_UI_TOOL,
 ];
 
+export function getToolsForRole(role: RoleName): Anthropic.Tool[] {
+  const allowed = getToolNamesForRole(role);
+  if (allowed === "ALL") return ALL_TOOLS;
+  return ALL_TOOLS.filter((t) => allowed.includes(t.name));
+}
+
 // ---- Command Registry ----
 const bookRepo = getBookRepository();
 const commands = {
@@ -187,7 +195,10 @@ const commands = {
   generate_audio: new GenerateAudioCommand(),
 };
 
-export async function createToolResults(toolUses: Anthropic.Messages.ToolUseBlock[]) {
+export async function createToolResults(
+  toolUses: Anthropic.Messages.ToolUseBlock[],
+  role?: RoleName,
+) {
   return Promise.all(
     toolUses.map(
       async (toolUse): Promise<Anthropic.Messages.ToolResultBlockParam> => {
@@ -195,7 +206,10 @@ export async function createToolResults(toolUses: Anthropic.Messages.ToolUseBloc
           const command = (commands as any)[toolUse.name];
           if (!command) throw new Error(`Unknown tool: ${toolUse.name}`);
 
-          const result = await command.execute(toolUse.input);
+          const input = role
+            ? { ...(toolUse.input as Record<string, unknown>), role }
+            : toolUse.input;
+          const result = await command.execute(input);
           return {
             type: "tool_result" as const,
             tool_use_id: toolUse.id,

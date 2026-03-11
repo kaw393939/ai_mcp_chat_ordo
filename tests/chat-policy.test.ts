@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from "vitest";
-import { getModelCandidates, looksLikeMath, SYSTEM_PROMPT } from "@/lib/chat/policy";
+import { getModelCandidates, looksLikeMath, buildSystemPrompt } from "@/lib/chat/policy";
 
 const ORIGINAL_ENV = process.env;
 
@@ -20,8 +20,9 @@ describe("chat policy", () => {
     expect(looksLikeMath("hello there")).toBe(false);
   });
 
-  it("includes mandatory calculator usage in system prompt", () => {
-    expect(SYSTEM_PROMPT).toContain("MUST use");
+  it("includes mandatory calculator usage in system prompt", async () => {
+    const prompt = await buildSystemPrompt("AUTHENTICATED");
+    expect(prompt).toContain("MUST use");
   });
 
   it("returns configured model first and dedupes", () => {

@@ -5,14 +5,25 @@ import { GetChapterInteractor } from "../GetChapterInteractor";
 import { ChecklistInteractor } from "../ChecklistInteractor";
 import { PractitionerInteractor } from "../PractitionerInteractor";
 import { BookSummaryInteractor } from "../BookSummaryInteractor";
+import type { RoleName } from "../../entities/user";
 
-export class SearchBooksCommand implements ToolCommand<{ query: string; max_results?: number }, string> {
+export class SearchBooksCommand implements ToolCommand<{ query: string; max_results?: number; role?: RoleName }, string> {
   private readonly search: LibrarySearchInteractor;
   constructor(repo: BookRepository) { this.search = new LibrarySearchInteractor(repo); }
 
-  async execute({ query, max_results = 5 }: { query: string; max_results?: number }) {
+  async execute({ query, max_results = 5, role }: { query: string; max_results?: number; role?: RoleName }) {
     const results = await this.search.execute({ query, maxResults: Math.min(max_results, 15) });
     if (results.length === 0) return `No results found for "${query}".`;
+
+    if (role === "ANONYMOUS") {
+      return JSON.stringify(results.map(r => ({
+        book: `${r.bookNumber}. ${r.bookTitle}`,
+        bookNumber: r.bookNumber,
+        chapter: r.chapterTitle,
+        relevance: r.relevance,
+      })), null, 2);
+    }
+
     return JSON.stringify(results.map(r => ({
       book: `${r.bookNumber}. ${r.bookTitle}`,
       bookNumber: r.bookNumber,

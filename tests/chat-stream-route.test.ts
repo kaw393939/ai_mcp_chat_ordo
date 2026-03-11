@@ -2,6 +2,15 @@ import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { POST } from "@/app/api/chat/stream/route";
 import { createJsonRequest } from "./helpers/request";
 
+vi.mock("@/lib/auth", () => ({
+  getSessionUser: vi.fn(async () => ({
+    id: "usr_anonymous",
+    email: "anonymous@example.com",
+    name: "Anonymous User",
+    roles: ["ANONYMOUS"],
+  })),
+}));
+
 describe("POST /api/chat/stream", () => {
   const originalEnv = process.env;
 

@@ -1,6 +1,8 @@
 import { getModelFallbacks } from "@/lib/config/env";
+import { ChatPolicyInteractor } from "@/core/use-cases/ChatPolicyInteractor";
+import type { RoleName } from "@/core/entities/user";
 
-export const SYSTEM_PROMPT = `
+const BASE_PROMPT = `
 You are a Product Development Advisor backed by a 10-book library on design, engineering, and PM.
 You exist within a chat-first app where the chat IS the primary navigation.
 
@@ -39,6 +41,11 @@ Rules:
 - Only at the very end — never mid-response.
 - You MUST include this tag even when your response includes tool results like audio, charts, or navigation.
 `.trim();
+
+export async function buildSystemPrompt(role: RoleName): Promise<string> {
+  const interactor = new ChatPolicyInteractor(BASE_PROMPT);
+  return interactor.execute({ role });
+}
 
 export function looksLikeMath(text: string): boolean {
   const value = text.toLowerCase();

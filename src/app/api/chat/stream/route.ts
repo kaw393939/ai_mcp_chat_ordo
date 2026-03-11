@@ -1,13 +1,16 @@
 import type { NextRequest } from "next/server";
 import { NextResponse } from "next/server";
 import { getAnthropicApiKey } from "@/lib/config/env";
-import { looksLikeMath } from "@/lib/chat/policy";
+import { looksLikeMath, buildSystemPrompt } from "@/lib/chat/policy";
 import {
   errorJson,
   runRouteTemplate,
   successText,
 } from "@/lib/chat/http-facade";
 import { runClaudeAgentLoopStream } from "@/lib/chat/anthropic-stream";
+import { getToolsForRole } from "@/lib/chat/tools";
+import { getSessionUser } from "@/lib/auth";
+import type { RoleName } from "@/core/entities/user";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -25,6 +28,10 @@ export async function POST(request: NextRequest) {
     request,
     execute: async (context) => {
       const apiKey = getAnthropicApiKey();
+      const user = await getSessionUser();
+      const role = user.roles[0] as RoleName;
+      const systemPrompt = await buildSystemPrompt(role);
+      const tools = getToolsForRole(role);
 
       const body = (await request.json()) as { messages?: ChatMessage[] };
       const incomingMessages = body.messages ?? [];
@@ -44,7 +51,10 @@ export async function POST(request: NextRequest) {
       if (looksLikeMath(latestUserMessage)) {
         const mathResponse = await fetch(new URL("/api/chat", request.url), {
           method: "POST",
-          headers: { "Content-Type": "application/json" },
+          headers: {
+            "Content-Type": "application/json",
+            Cookie: request.headers.get("cookie") || "",
+          },
           body: JSON.stringify({ messages: incomingMessages }),
         });
 
@@ -73,6 +83,9 @@ export async function POST(request: NextRequest) {
               apiKey,
               messages: incomingMessages,
               signal: streamAbortController.signal,
+              systemPrompt,
+              tools,
+              role,
               callbacks: {
                 onDelta(text) {
                   controller.enqueue(encoder.encode(sseChunk({ delta: text })));

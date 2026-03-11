@@ -2,15 +2,18 @@ import type Anthropic from "@anthropic-ai/sdk";
 import type { ChatProvider } from "@/lib/chat/anthropic-client";
 import { createToolResults } from "@/lib/chat/tools";
 import type { ToolChoice } from "@/lib/chat/types";
+import type { RoleName } from "@/core/entities/user";
 
 export async function orchestrateChatTurn({
   provider,
   conversation,
   toolChoice,
+  role,
 }: {
   provider: ChatProvider;
   conversation: Anthropic.MessageParam[];
   toolChoice: ToolChoice;
+  role?: RoleName;
 }) {
   let nextToolChoice = toolChoice;
 
@@ -41,7 +44,7 @@ export async function orchestrateChatTurn({
     };
     conversation.push(assistantMessage);
 
-    const toolResults = await createToolResults(toolUses);
+    const toolResults = await createToolResults(toolUses, role);
     const toolResultMessage: Anthropic.MessageParam = {
       role: "user",
       content: toolResults,

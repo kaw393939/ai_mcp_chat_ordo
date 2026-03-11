@@ -10,10 +10,10 @@ import type { BookRepository } from "@/core/use-cases/BookRepository";
 // Minimal mock BookRepository — returns canned data, no filesystem
 const mockBookRepo: BookRepository = {
   getAllBooks: vi.fn().mockResolvedValue([]),
-  getBookBySlug: vi.fn().mockResolvedValue(null),
+  getBook: vi.fn().mockResolvedValue(null),
   getAllChapters: vi.fn().mockResolvedValue([]),
   getChaptersByBook: vi.fn().mockResolvedValue([]),
-  getChapterBySlug: vi.fn().mockResolvedValue(null),
+  getChapter: vi.fn().mockResolvedValue({ bookSlug: "", chapterSlug: "", bookTitle: "", title: "", content: "", slug: "" }),
 };
 
 function buildStack() {
@@ -103,17 +103,20 @@ describe("Tool Registry Integration", () => {
   it("logs START + SUCCESS for successful execution", async () => {
     const { executor } = buildStack();
     await executor("calculator", { operation: "add", a: 1, b: 2 }, anonCtx);
-    const logs = logSpy.mock.calls.map(c => c[0]);
-    expect(logs.some((l: string) => l.includes("[Tool:calculator] START"))).toBe(true);
-    expect(logs.some((l: string) => l.includes("[Tool:calculator] SUCCESS"))).toBe(true);
+    const logs: string[] = logSpy.mock.calls.map((c: unknown[]) => c[0] as string);
+    expect(logs.some(l => l.includes("[Tool:calculator] START"))).toBe(true);
+    expect(logs.some(l => l.includes("[Tool:calculator] SUCCESS"))).toBe(true);
   });
 
   it("logs START + ERROR for denied access", async () => {
     const { executor } = buildStack();
     try { await executor("get_chapter", {}, anonCtx); } catch { /* expected */ }
-    const allLogs = [...logSpy.mock.calls.map(c => c[0]), ...errorSpy.mock.calls.map(c => c[0])];
-    expect(allLogs.some((l: string) => l.includes("[Tool:get_chapter] START"))).toBe(true);
-    expect(allLogs.some((l: string) => l.includes("[Tool:get_chapter] ERROR"))).toBe(true);
+    const allLogs = [
+      ...logSpy.mock.calls.map((c: unknown[]) => c[0] as string),
+      ...errorSpy.mock.calls.map((c: unknown[]) => c[0] as string),
+    ];
+    expect(allLogs.some(l => l.includes("[Tool:get_chapter] START"))).toBe(true);
+    expect(allLogs.some(l => l.includes("[Tool:get_chapter] ERROR"))).toBe(true);
   });
 });
 

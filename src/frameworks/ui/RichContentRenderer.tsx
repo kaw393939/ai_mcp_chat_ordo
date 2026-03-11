@@ -1,5 +1,5 @@
-import React, { useState, useMemo } from "react";
-import { UI_CONSTANTS } from "@/lib/constants";
+import React, { useMemo } from "react";
+import { CodeBlock } from "./CodeBlock";
 import type {
   RichContent,
   BlockNode,
@@ -157,36 +157,6 @@ const InlineRenderer: React.FC<{
         return <RendererComponent key={i} node={node} onLinkClick={onLinkClick} />;
       })}
     </>
-  );
-};
-
-const CodeBlock: React.FC<{ code: string; lang?: string }> = ({
-  code,
-  lang,
-}) => {
-  const [copied, setCopied] = React.useState(false);
-  const copyCode = () => {
-    void navigator.clipboard.writeText(code);
-    setCopied(true);
-    setTimeout(() => setCopied(false), UI_CONSTANTS.COPY_TIMEOUT_MS);
-  };
-  return (
-    <div className="my-4 rounded-xl overflow-hidden border-theme text-sm">
-      <div className="flex items-center justify-between code-chrome px-4 py-2">
-        <span className="text-label font-mono opacity-70">
-          {lang || "code"}
-        </span>
-        <button
-          onClick={copyCode}
-          className="text-[10px] opacity-60 hover:opacity-100 transition-colors flex items-center gap-1"
-        >
-          {copied ? "✓ Copied" : "Copy"}
-        </button>
-      </div>
-      <pre className="code-chrome px-5 py-4 overflow-x-auto font-mono text-sm leading-relaxed border-t border-[var(--border-color)]">
-        <code>{code}</code>
-      </pre>
-    </div>
   );
 };
 

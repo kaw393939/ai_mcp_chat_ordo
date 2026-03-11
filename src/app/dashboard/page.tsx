@@ -31,7 +31,7 @@ const DashboardCard = ({
           <p className="text-label opacity-40 mt-1">{subtitle}</p>
         </div>
       </div>
-      <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse shadow-[0_0_8px_rgba(16,185,129,0.5)]" />
+      <div className="w-2 h-2 rounded-full bg-[var(--status-success)] animate-pulse shadow-[0_0_8px_var(--status-success)]" />
     </div>
     <div className="flex-1 flex flex-col gap-4">
       {children}
@@ -122,12 +122,12 @@ export default function DashboardPage() {
               <div className="bg-[var(--surface-muted)] rounded-2xl p-4 border-theme">
                 <div className="flex items-center justify-between mb-2">
                   <span className="text-label opacity-40">System Readiness</span>
-                  <span className="text-label text-emerald-500">Operational</span>
+                  <span className="text-label text-[var(--status-success)]">Operational</span>
                 </div>
                 <div className="flex gap-1 h-1.5">
-                  <div className="flex-1 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.3)]" />
-                  <div className="flex-1 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.3)]" />
-                  <div className="flex-1 bg-emerald-500 rounded-full shadow-[0_0_8px_rgba(16,185,129,0.3)]" />
+                  <div className="flex-1 bg-[var(--status-success)] rounded-full shadow-[0_0_8px_var(--status-success)]" />
+                  <div className="flex-1 bg-[var(--status-success)] rounded-full shadow-[0_0_8px_var(--status-success)]" />
+                  <div className="flex-1 bg-[var(--status-success)] rounded-full shadow-[0_0_8px_var(--status-success)]" />
                   <div className="flex-1 bg-[var(--surface-muted)] rounded-full" />
                 </div>
               </div>
@@ -223,7 +223,7 @@ export default function DashboardPage() {
                 </div>
                 <div className="flex items-center justify-between">
                   <span className="text-xs font-bold opacity-60">Churn Risk</span>
-                  <span className="text-xs font-black text-emerald-500">LOW</span>
+                  <span className="text-xs font-black text-[var(--status-success)]">LOW</span>
                 </div>
               </div>
               <div className="mt-auto p-4 rounded-2xl bg-[var(--accent-color)]/5 border border-[var(--accent-color)]/10">
@@ -252,7 +252,7 @@ export default function DashboardPage() {
                       <p className="text-[11px] font-black leading-tight uppercase tracking-tight">{config.label}</p>
                       <p className="text-[9px] opacity-40 truncate font-bold">{config.description}</p>
                     </div>
-                    {localRole === role && <span className="ml-auto text-emerald-500 text-[10px]">●</span>}
+                    {localRole === role && <span className="ml-auto text-[var(--status-success)] text-[10px]">●</span>}
                   </button>
                 ))}
             </div>

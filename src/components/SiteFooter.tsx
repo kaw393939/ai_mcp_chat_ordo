@@ -52,7 +52,7 @@ export function SiteFooter() {
           © 2026 Studio Ordo. All rights reserved.
         </span>
         <div className="flex gap-4">
-          <div className="w-1.5 h-1.5 rounded-full bg-emerald-500/50" />
+          <div className="w-1.5 h-1.5 rounded-full bg-[var(--status-success)]/50" />
           <span className="text-[9px] font-bold opacity-50 uppercase tracking-widest">Global Status: Optimal</span>
         </div>
       </div>

@@ -7,6 +7,21 @@ export class SetThemeCommand implements ToolCommand<{ theme: string }, string> {
   }
 }
 
+export class AdjustUICommand implements ToolCommand<Record<string, unknown>, string> {
+  async execute(args: Record<string, unknown>) {
+    const applied: string[] = [];
+    if (args.preset) applied.push(`preset=${args.preset}`);
+    if (args.fontSize) applied.push(`fontSize=${args.fontSize}`);
+    if (args.lineHeight) applied.push(`lineHeight=${args.lineHeight}`);
+    if (args.letterSpacing) applied.push(`letterSpacing=${args.letterSpacing}`);
+    if (args.density) applied.push(`density=${args.density}`);
+    if (args.dark !== undefined) applied.push(`dark=${args.dark}`);
+    if (args.theme) applied.push(`theme=${args.theme}`);
+    if (args.colorBlindMode) applied.push(`colorBlindMode=${args.colorBlindMode}`);
+    return `Success. UI adjusted: ${applied.join(", ")}.`;
+  }
+}
+
 export class NavigateCommand implements ToolCommand<{ path: string }, string> {
   async execute({ path }: { path: string }) {
     if (!path) throw new Error("Path must be provided.");

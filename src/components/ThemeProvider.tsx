@@ -10,11 +10,16 @@ export type SpacingLevel = "tight" | "normal" | "relaxed";
 
 export type Density = "compact" | "normal" | "relaxed";
 
+export type ColorBlindMode = "none" | "deuteranopia" | "protanopia" | "tritanopia";
+
+export type UIPreset = "default" | "elderly" | "compact" | "high-contrast" | "color-blind-deuteranopia" | "color-blind-protanopia" | "color-blind-tritanopia";
+
 export interface AccessibilitySettings {
   fontSize: FontSize;
   lineHeight: SpacingLevel;
   letterSpacing: SpacingLevel;
   density: Density;
+  colorBlindMode: ColorBlindMode;
 }
 
 const ACCESSIBILITY_DEFAULTS: AccessibilitySettings = {
@@ -22,6 +27,17 @@ const ACCESSIBILITY_DEFAULTS: AccessibilitySettings = {
   lineHeight: "normal",
   letterSpacing: "normal",
   density: "normal",
+  colorBlindMode: "none",
+};
+
+export const UI_PRESETS: Record<UIPreset, Partial<AccessibilitySettings> & { dark?: boolean; theme?: Theme }> = {
+  default: { fontSize: "md", lineHeight: "normal", letterSpacing: "normal", density: "normal", colorBlindMode: "none" },
+  elderly: { fontSize: "xl", lineHeight: "relaxed", letterSpacing: "relaxed", density: "relaxed" },
+  compact: { fontSize: "xs", lineHeight: "tight", letterSpacing: "tight", density: "compact" },
+  "high-contrast": { dark: true, fontSize: "lg", lineHeight: "relaxed" },
+  "color-blind-deuteranopia": { colorBlindMode: "deuteranopia" },
+  "color-blind-protanopia": { colorBlindMode: "protanopia" },
+  "color-blind-tritanopia": { colorBlindMode: "tritanopia" },
 };
 
 interface ThemeContextType {
@@ -145,9 +161,19 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
         "data-density",
         accessibility.density,
       );
+
+      // Color-blind mode
+      if (accessibility.colorBlindMode !== "none") {
+        document.documentElement.setAttribute(
+          "data-color-blind",
+          accessibility.colorBlindMode,
+        );
+      } else {
+        document.documentElement.removeAttribute("data-color-blind");
+      }
     };
 
-    if (document.startViewTransition) {
+    if (document.startViewTransition && document.visibilityState === "visible") {
       document.startViewTransition(updateState);
     } else {
       updateState();

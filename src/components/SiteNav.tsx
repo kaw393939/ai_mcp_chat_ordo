@@ -75,7 +75,7 @@ export function SiteNav({ user }: SiteNavProps) {
           </div>
           <div className="w-px h-4 bg-[var(--border-color)]" />
           <div className="flex items-center gap-1.5">
-            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="w-1.5 h-1.5 rounded-full bg-[var(--status-success)] animate-pulse" />
             <span className="text-[9px] font-bold opacity-40 uppercase tracking-widest">System Ready</span>
           </div>
         </div>

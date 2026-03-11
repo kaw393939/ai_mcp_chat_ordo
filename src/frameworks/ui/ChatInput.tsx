@@ -123,7 +123,8 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           e.preventDefault();
           onSend();
         }}
-        className="relative flex items-center gap-1.5 bg-[var(--surface)] border-theme rounded-full p-1 sm:p-1.5 transition-all duration-500 focus-within:border-[var(--accent-color)] focus-within:ring-2 focus-within:ring-[var(--accent-color)]/10 shadow-sm hover:shadow-md"
+        className="relative flex items-center gap-1.5 bg-[var(--surface)] border-theme rounded-full transition-all duration-500 focus-within:border-[var(--accent-color)] focus-within:ring-2 focus-within:ring-[var(--accent-color)]/10 shadow-sm hover:shadow-md"
+        style={{ padding: 'var(--input-padding)' }}
       >
         {activeTrigger && suggestions.length > 0 && (
           <MentionsMenu

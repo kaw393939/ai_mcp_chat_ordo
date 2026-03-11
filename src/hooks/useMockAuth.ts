@@ -14,7 +14,7 @@ export const ROLE_CONFIG: Record<
   },
   AUTHENTICATED: {
     label: "Authenticated",
-    dot: "bg-emerald-500",
+    dot: "bg-[var(--status-success)]",
     description: "Signed-in user — full library access",
   },
   STAFF: {

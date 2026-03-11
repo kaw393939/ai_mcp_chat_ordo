@@ -8,6 +8,7 @@ import {
 } from "@/core/use-cases/tools/BookTools";
 import { 
   SetThemeCommand, 
+  AdjustUICommand,
   NavigateCommand, 
   GenerateChartCommand, 
   GenerateAudioCommand 
@@ -137,6 +138,24 @@ export const NAVIGATE_TOOL: Anthropic.Tool = {
   },
 };
 
+export const ADJUST_UI_TOOL: Anthropic.Tool = {
+  name: "adjust_ui",
+  description: "Adjust the UI appearance for accessibility, comfort, or user preference. Use when users say things like 'make text bigger', 'I'm old', 'too bright', 'I'm color blind', 'compact mode', or 'hard to read'. You can apply a named preset OR set individual properties. Presets: 'elderly' (large text, relaxed spacing), 'compact' (dense info), 'high-contrast' (dark + large), 'color-blind-deuteranopia', 'color-blind-protanopia', 'color-blind-tritanopia', 'default' (reset all).",
+  input_schema: {
+    type: "object",
+    properties: {
+      preset: { type: "string", enum: ["default", "elderly", "compact", "high-contrast", "color-blind-deuteranopia", "color-blind-protanopia", "color-blind-tritanopia"], description: "Apply a curated preset. Overrides individual settings." },
+      fontSize: { type: "string", enum: ["xs", "sm", "md", "lg", "xl"], description: "Base font size." },
+      lineHeight: { type: "string", enum: ["tight", "normal", "relaxed"], description: "Line spacing." },
+      letterSpacing: { type: "string", enum: ["tight", "normal", "relaxed"], description: "Letter spacing." },
+      density: { type: "string", enum: ["compact", "normal", "relaxed"], description: "UI density — affects padding and gaps." },
+      dark: { type: "boolean", description: "Enable or disable dark mode." },
+      theme: { type: "string", enum: ["bauhaus", "swiss", "postmodern", "skeuomorphic", "fluid"], description: "Visual theme era." },
+      colorBlindMode: { type: "string", enum: ["none", "deuteranopia", "protanopia", "tritanopia"], description: "Color-blind safe palette." },
+    },
+  },
+};
+
 export const ALL_TOOLS: Anthropic.Tool[] = [
   CALCULATOR_TOOL,
   SEARCH_BOOKS_TOOL,
@@ -148,6 +167,7 @@ export const ALL_TOOLS: Anthropic.Tool[] = [
   GENERATE_AUDIO_TOOL,
   SET_THEME_TOOL,
   NAVIGATE_TOOL,
+  ADJUST_UI_TOOL,
 ];
 
 // ---- Command Registry ----
@@ -159,6 +179,7 @@ const commands = {
   list_practitioners: new ListPractitionersCommand(),
   get_book_summary: new GetBookSummaryCommand(),
   set_theme: new SetThemeCommand(),
+  adjust_ui: new AdjustUICommand(),
   navigate: new NavigateCommand(),
   generate_chart: new GenerateChartCommand(),
   generate_audio: new GenerateAudioCommand(),

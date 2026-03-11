@@ -12,6 +12,7 @@ const SUGGESTION_REGEX = /__suggestions__:\[([\s\S]*?)\]/;
 const TOOL_NAMES = {
   SET_THEME: "set_theme",
   NAVIGATE: "navigate",
+  ADJUST_UI: "adjust_ui",
   GENERATE_CHART: "generate_chart",
   GENERATE_AUDIO: "generate_audio",
 } as const;
@@ -66,6 +67,12 @@ export class ChatPresenter {
           commands.push({
             type: UI_COMMAND_TYPE.NAVIGATE,
             path: call.args.path as string,
+          });
+          break;
+        case TOOL_NAMES.ADJUST_UI:
+          commands.push({
+            type: UI_COMMAND_TYPE.ADJUST_UI,
+            settings: call.args as Record<string, unknown>,
           });
           break;
         case TOOL_NAMES.GENERATE_CHART:

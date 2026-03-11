@@ -48,7 +48,7 @@ export const ChatHeader: React.FC<ChatHeaderProps> = ({
           <div>
             <h3 className="text-sm font-bold tracking-tight">{title}</h3>
             <div className="flex items-center gap-1.5 leading-none">
-              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+              <span className="w-1.5 h-1.5 rounded-full bg-[var(--status-success)] animate-pulse" />
               <span className="text-[9px] opacity-40 font-bold uppercase tracking-wider">
                 PD Advisor
               </span>

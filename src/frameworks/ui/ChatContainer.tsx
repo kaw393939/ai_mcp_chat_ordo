@@ -12,17 +12,8 @@ import { ChatPresenter } from "../../adapters/ChatPresenter";
 import { MarkdownParserService } from "../../adapters/MarkdownParserService";
 import { CommandParserService } from "../../adapters/CommandParserService";
 import { useUICommands } from "@/hooks/useUICommands";
+import { useCommandRegistry } from "@/hooks/useCommandRegistry";
 import { commandRegistry } from "../../core/commands/CommandRegistry";
-import { NavigationCommand } from "../../core/commands/NavigationCommands";
-import { ThemeCommand } from "../../core/commands/ThemeCommands";
-import { 
-  SearchBooksCommand, 
-  GetChapterCommand, 
-  GetChecklistCommand, 
-  ListPractitionersCommand,
-  GetBookSummaryCommand
-} from "../../core/use-cases/tools/BookTools";
-import { useRouter } from "next/navigation";
 
 interface Props {
   isFloating?: boolean;
@@ -40,9 +31,9 @@ export const ChatContainer: React.FC<Props> = ({
     setAccessibility,
     gridEnabled,
     setGridEnabled,
-    setTheme,
   } = useTheme();
-  const router = useRouter();
+
+  useCommandRegistry();
 
   const markdownParser = useMemo(() => new MarkdownParserService(), []);
   const commandParser = useMemo(() => new CommandParserService(), []);
@@ -55,27 +46,6 @@ export const ChatContainer: React.FC<Props> = ({
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [sessionSearchQuery, setSessionSearchQuery] = useState("");
   const [mentionIndex, setMentionIndex] = useState(0);
-
-  // Register Commands
-  useMemo(() => {
-    const navigate = (path: string) => router.push(path);
-    // Navigation
-    commandRegistry.register(new NavigationCommand("library", "Go to Library", "Navigation", navigate, "/books"));
-    commandRegistry.register(new NavigationCommand("training", "Go to Training", "Navigation", navigate, "/training"));
-    commandRegistry.register(new NavigationCommand("studio", "Go to Studio", "Navigation", navigate, "/studio"));
-    
-    // Themes
-    commandRegistry.register(new ThemeCommand("theme-fluid", "Set Theme: Fluid", "Themes", setTheme, "fluid"));
-    commandRegistry.register(new ThemeCommand("theme-swiss", "Set Theme: Swiss Grid", "Themes", setTheme, "swiss"));
-    commandRegistry.register(new ThemeCommand("theme-bauhaus", "Set Theme: Bauhaus", "Themes", setTheme, "bauhaus"));
-    commandRegistry.register(new ThemeCommand("theme-postmodern", "Set Theme: Postmodern", "Themes", setTheme, "postmodern"));
-    commandRegistry.register(new ThemeCommand("theme-skeuomorphic", "Set Theme: Skeuomorphic", "Themes", setTheme, "skeuomorphic"));
-
-    // Tools
-    commandRegistry.register({ id: "search", title: "Search Library", category: "Tools", execute: () => console.log("Trigger search via input") } as any);
-    commandRegistry.register({ id: "checklists", title: "Get Checklists", category: "Tools", execute: () => console.log("Trigger checklists") } as any);
-    commandRegistry.register({ id: "practitioners", title: "List Practitioners", category: "Tools", execute: () => console.log("Trigger practitioners") } as any);
-  }, [router, setTheme]);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 

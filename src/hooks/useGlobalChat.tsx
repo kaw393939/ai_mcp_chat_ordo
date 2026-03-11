@@ -3,8 +3,8 @@
 import React, { createContext, useContext, useReducer, useState, useMemo, ReactNode } from "react";
 export type { MessagePart } from "@/core/entities/message-parts";
 import type { MessagePart } from "@/core/entities/message-parts";
-export type { ChatMessage } from "@/core/entities/MessageFactory";
-import type { ChatMessage } from "@/core/entities/MessageFactory";
+export type { ChatMessage } from "@/core/entities/chat-message";
+import type { ChatMessage } from "@/core/entities/chat-message";
 
 import { 
   StreamProcessor, 
@@ -87,7 +87,7 @@ function chatReducer(state: ChatMessage[], action: ChatAction): ChatMessage[] {
     case "SET_ERROR": {
       return [
         ...state.slice(0, action.index),
-        { role: "assistant", content: action.error, parts: [], timestamp: new Date() },
+        { id: crypto.randomUUID(), role: "assistant", content: action.error, parts: [], timestamp: new Date() },
       ];
     }
     default:

@@ -1,17 +1,11 @@
 import type { MessagePart } from "./message-parts";
-
-export interface ChatMessage {
-  role: "user" | "assistant";
-  content: string;
-  parts?: MessagePart[];
-  timestamp?: Date;
-}
+import type { ChatMessage } from "./chat-message";
 
 /**
  * Message Factory (GoF Factory Method)
  * 
  * Standardizes the creation of ChatMessage entities ensuring 
- * consistent default values for timestamps and metadata.
+ * consistent default values for id, timestamps, and metadata.
  */
 export class MessageFactory {
   static create(
@@ -20,6 +14,7 @@ export class MessageFactory {
     parts: MessagePart[] = []
   ): ChatMessage {
     return {
+      id: crypto.randomUUID(),
       role,
       content,
       parts,

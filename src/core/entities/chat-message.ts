@@ -1,3 +1,5 @@
+import type { MessagePart } from "./message-parts";
+
 export type MessageRole = "user" | "assistant" | "system";
 
 export interface ChatMessage {
@@ -5,7 +7,7 @@ export interface ChatMessage {
   role: MessageRole;
   content: string;
   timestamp: Date;
-  parts?: unknown[];
+  parts?: MessagePart[];
 }
 
 export interface ToolCallInfo {
@@ -13,12 +15,11 @@ export interface ToolCallInfo {
   args: Record<string, unknown>;
 }
 
-export function extractToolCalls(parts?: unknown[]): ToolCallInfo[] {
+export function extractToolCalls(parts?: MessagePart[]): ToolCallInfo[] {
   if (!parts) return [];
   const calls: ToolCallInfo[] = [];
-  for (const rawPart of parts) {
-    const part = rawPart as { type?: string; name?: string; args?: Record<string, unknown> };
-    if (part && typeof part === "object" && part.type === "tool_call" && part.name && part.args) {
+  for (const part of parts) {
+    if (part.type === "tool_call") {
       calls.push({ name: part.name, args: part.args });
     }
   }

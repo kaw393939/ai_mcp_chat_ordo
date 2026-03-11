@@ -84,6 +84,38 @@ export function ensureSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id);
   `);
 
+  // Embeddings table for vector search (§5.2)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS embeddings (
+      id TEXT PRIMARY KEY,
+      source_type TEXT NOT NULL,
+      source_id TEXT NOT NULL,
+      chunk_index INTEGER NOT NULL,
+      chunk_level TEXT NOT NULL,
+      heading TEXT,
+      content TEXT NOT NULL,
+      embedding_input TEXT NOT NULL,
+      content_hash TEXT NOT NULL,
+      model_version TEXT NOT NULL,
+      embedding BLOB NOT NULL,
+      metadata TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    CREATE INDEX IF NOT EXISTS idx_emb_source_type ON embeddings(source_type);
+    CREATE INDEX IF NOT EXISTS idx_emb_source_id ON embeddings(source_id);
+    CREATE INDEX IF NOT EXISTS idx_emb_level ON embeddings(chunk_level);
+    CREATE INDEX IF NOT EXISTS idx_emb_hash ON embeddings(source_id, content_hash);
+    CREATE INDEX IF NOT EXISTS idx_emb_model ON embeddings(model_version);
+
+    CREATE TABLE IF NOT EXISTS bm25_stats (
+      source_type TEXT PRIMARY KEY,
+      stats_json TEXT NOT NULL,
+      updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+  `);
+
   // Seed roles
   const seedRoles = db.prepare(`
     INSERT OR IGNORE INTO roles (id, name, description)

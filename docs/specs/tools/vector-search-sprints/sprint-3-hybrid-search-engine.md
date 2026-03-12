@@ -4,8 +4,82 @@
 > query processing pipeline, and the Chain of Responsibility fallback chain. After
 > this sprint, `HybridSearchEngine.search()` returns ranked results from real
 > embeddings. Not yet wired to the chat tool — that's Sprint 4.
-> **Spec ref:** §6.1–6.7, §7.1–7.6
-> **Prerequisite:** Sprint 2 complete (embeddings populated in SQLite)
+> **Spec ref:** §6.1–6.7, §7.1–7.6, §8
+> **Prerequisite:** Sprint 2 complete (embeddings populated in SQLite, 574 chunks
+> from 104 chapters in `.data/local.db`, BM25 index with 6566 terms)
+
+---
+
+## Available Assets (from Sprints 0–2)
+
+All ports, adapters, and utilities listed below already exist and are **imported,
+not created**, by Sprint 3.
+
+### Port Interfaces (`src/core/search/ports/`)
+
+| Port | File | Key Signatures |
+| --- | --- | --- |
+| `Embedder` | `Embedder.ts` | `embed(text): Promise<Float32Array>`, `embedBatch(texts)`, `dimensions(): number`, `isReady(): boolean` |
+| `VectorStore` | `VectorStore.ts` | `upsert(records)`, `getAll(query?): EmbeddingRecord[]`, `count()` |
+| `BM25IndexStore` | `BM25IndexStore.ts` | `getIndex(sourceType): BM25Index \| null`, `saveIndex(sourceType, index)`, `isStale(sourceType): boolean` |
+| `SearchHandler` | `SearchHandler.ts` | `canHandle(): boolean`, `search(query, filters?): Promise<HybridSearchResult[]>`, `setNext(handler): SearchHandler` |
+| `QueryProcessingStep` | `QueryProcessingStep.ts` | `process(tokens: string[]): string[]`, `readonly name: string` |
+| `Chunker` | `Chunker.ts` | `chunk(content, metadata, options?): Chunk[]` |
+
+### Core Utilities (`src/core/search/`)
+
+| Utility | File | Signature / Notes |
+| --- | --- | --- |
+| `BM25Scorer` | `BM25Scorer.ts` | `constructor(k1 = 1.2, b = 0.75)`, `score(queryTerms: string[], docTokens: string[], docLength: number, index: BM25Index): number` — needs per-document tokens at query time |
+| `reciprocalRankFusion` | `ReciprocalRankFusion.ts` | `reciprocalRankFusion(rankings: Map<string, number>[], k = 60): Map<string, number>` — input: array of `(chunkId → rank)` maps, output: `(chunkId → rrfScore)` map |
+| `dotSimilarity` | `dotSimilarity.ts` | `dotSimilarity(a: Float32Array, b: Float32Array): number` |
+| `l2Normalize` | `l2Normalize.ts` | `l2Normalize(vec: Float32Array): Float32Array` |
+| `MarkdownChunker` | `MarkdownChunker.ts` | Implements `Chunker` — 200-400 word chunks with heading context |
+| `EmbeddingPipeline` | `EmbeddingPipeline.ts` | `indexDocuments(docs)`, `rebuildAll(docs)` |
+| `EmbeddingPipelineFactory` | `EmbeddingPipelineFactory.ts` | `createForSource(sourceType)` |
+| `ChangeDetector` | `ChangeDetector.ts` | Incremental rebuild via SHA-256 content hashing |
+| `EmbeddingValidator` | `EmbeddingValidator.ts` | Validates embedding quality post-build |
+
+### Types (`src/core/search/types.ts`)
+
+Already defined and re-exported:
+
+- `HybridSearchResult` — 14 fields: `bookTitle`, `bookNumber`, `bookSlug`, `chapterTitle`, `chapterSlug`, `rrfScore`, `vectorRank`, `bm25Rank`, `relevance`, `matchPassage`, `matchSection`, `matchHighlight`, `passageOffset`
+- `IndexResult`, `RebuildResult`, `DocumentInput`
+- `EmbeddingRecord` — includes `id`, `sourceType`, `sourceId`, `chunkIndex`, `chunkLevel`, `heading`, `content`, `embeddingInput`, `contentHash`, `modelVersion`, `embedding: Float32Array`, `metadata`
+- `BM25Index` — `avgDocLength`, `docCount`, `docLengths: Map<string, number>`, `termDocFrequencies: Map<string, number>`
+- `VectorQuery` — `sourceType?`, `chunkLevel?`, `limit?`
+- All port type re-exports: `Chunker`, `Embedder`, `VectorStore`, `BM25IndexStore`, `SearchHandler`, `QueryProcessingStep`
+
+### Adapters (Test Doubles) — `src/adapters/`
+
+| Adapter | File | Use in Sprint 3 Tests |
+| --- | --- | --- |
+| `InMemoryVectorStore` | `InMemoryVectorStore.ts` | Seed with test embeddings for HybridSearchEngine tests |
+| `InMemoryBM25IndexStore` | `InMemoryBM25IndexStore.ts` | Seed with test BM25 index for HybridSearchEngine tests |
+| `MockEmbedder` | `MockEmbedder.ts` | Deterministic 384-dim vectors from text; `isReady()` returns true after first `embed()` call |
+
+### Composition Root (`src/lib/chat/tool-composition-root.ts`)
+
+Currently exposes: `getToolRegistry()`, `getToolExecutor()`,
+`getEmbeddingPipelineFactory()`, `getBookPipeline()`.
+
+Does **not** yet expose: HybridSearchEngine, SearchHandlerChain, QueryProcessors,
+BM25Scorer, or BM25IndexStore instances. Sprint 3 must wire these.
+
+### LibrarySearchInteractor (`src/core/use-cases/LibrarySearchInteractor.ts`)
+
+Current signature:
+
+```typescript
+class LibrarySearchInteractor implements UseCase<SearchRequest, LibrarySearchResult[]> {
+  constructor(private bookRepository: BookQuery & ChapterQuery) {}
+  async execute(request: SearchRequest): Promise<LibrarySearchResult[]> { ... }
+}
+```
+
+Returns `LibrarySearchResult` (entity type with `matchContext: string`, `score: number`),
+**not** `HybridSearchResult`. Task 3.6 must bridge this gap.
 
 ---
 
@@ -175,13 +249,29 @@ class HybridSearchEngine {
 
 ```text
 1. Process query via vectorQueryProcessor (no synonyms)
+   → returns string[] of cleaned tokens
 2. Process query via bm25QueryProcessor (with synonyms)
-3. Embed vector-cleaned query → L2-normalize
-4. Vector retrieval: dot product against all passage embeddings → top 50
-5. BM25 retrieval: score all passages → top 50
-6. Reciprocal Rank Fusion → merged rankings
+   → returns string[] of cleaned + expanded tokens
+3. Embed vector-cleaned query (join tokens → embed → l2Normalize)
+   → 384-dim Float32Array (~10ms)
+4. Vector retrieval:
+   a. vectorStore.getAll({ sourceType, chunkLevel: "passage" })
+   b. dotSimilarity(queryVec, record.embedding) for each record
+   c. Sort descending → take top vectorTopN (50)
+   d. Build ranking: Map<chunkId, rank> (1-indexed)
+5. BM25 retrieval:
+   a. For each record from step 4a, tokenize record.content → docTokens
+   b. bm25Scorer.score(bm25QueryTerms, docTokens, docTokens.length, bm25Index)
+      ▸ Note: BM25Scorer.score() requires per-document tokens at query time
+   c. Sort descending → take top bm25TopN (50)
+   d. Build ranking: Map<chunkId, rank> (1-indexed)
+6. Reciprocal Rank Fusion:
+   a. reciprocalRankFusion([vectorRanking, bm25Ranking], options.rrfK)
+   b. Returns Map<chunkId, rrfScore>
+   c. Sort by rrfScore descending
 7. Deduplication: multiple passages from same chapter → keep best
-8. Return top N HybridSearchResult[]
+8. Attach metadata: bookTitle, chapterSlug, sectionHeading, passageOffset
+9. Return top maxResults (10) as HybridSearchResult[]
 ```
 
 ### Tests (`tests/search/hybrid-search-engine.test.ts`)
@@ -243,6 +333,14 @@ class EmptyResultHandler implements SearchHandler {
 }
 ```
 
+> **LegacyKeywordHandler result mapping:** This handler wraps the existing
+> `Chapter.calculateSearchScore()` logic and must produce `HybridSearchResult[]`.
+> Map: `matchContext → matchPassage`, `matchContext → matchHighlight` (no bold),
+> `score → rrfScore`, `vectorRank: null`, `bm25Rank: null`,
+> `matchSection: null`, `passageOffset: { start: 0, end: 0 }`.
+> Constructor takes `BookQuery & ChapterQuery` (same as current
+> `LibrarySearchInteractor.bookRepository`).
+
 ### Chain construction
 
 ```typescript
@@ -280,6 +378,7 @@ chapter.
 | Item | Detail |
 | --- | --- |
 | **Create** | `src/core/search/ResultFormatter.ts` |
+| **Create** | `tests/search/result-formatter.test.ts` |
 | **Spec** | §8 |
 | **Reqs** | VSEARCH-05, VSEARCH-06, VSEARCH-07 |
 
@@ -321,30 +420,84 @@ npx vitest run tests/search/result-formatter.test.ts   # 4 tests pass
 ## Task 3.6 — Wire into LibrarySearchInteractor (optional enhancer)
 
 **What:** Modify `LibrarySearchInteractor` to accept an optional
-`SearchHandlerChain`. When present, it delegates to hybrid search. When absent,
-existing keyword scoring continues to work unchanged.
+`SearchHandler`. When present, it delegates to hybrid search and maps
+`HybridSearchResult[]` → `LibrarySearchResult[]`. When absent, existing keyword
+scoring continues to work unchanged.
 
 | Item | Detail |
 | --- | --- |
 | **Modify** | `src/core/use-cases/LibrarySearchInteractor.ts` |
-| **Spec** | Phase 4.18 |
+| **Modify** | `src/lib/chat/tool-composition-root.ts` (wire chain) |
+| **Spec** | §6.7 (fallback chain construction) |
 | **Reqs** | VSEARCH-38, VSEARCH-39 |
 
 ### Integration pattern
 
 ```typescript
-class LibrarySearchInteractor {
+class LibrarySearchInteractor implements UseCase<SearchRequest, LibrarySearchResult[]> {
   constructor(
-    private bookQuery: BookQuery & ChapterQuery,
+    private bookRepository: BookQuery & ChapterQuery,
     private searchHandler?: SearchHandler,  // optional — fallback to legacy if absent
   ) {}
 
-  async searchBooks(query: string): Promise<SearchResult[]> {
+  async execute(request: SearchRequest): Promise<LibrarySearchResult[]> {
     if (this.searchHandler) {
-      return this.searchHandler.search(query);
+      const hybridResults = await this.searchHandler.search(request.query);
+      return hybridResults.slice(0, request.maxResults ?? 10).map(hr => ({
+        bookTitle: hr.bookTitle,
+        bookNumber: hr.bookNumber,
+        bookSlug: hr.bookSlug,
+        chapterTitle: hr.chapterTitle,
+        chapterSlug: hr.chapterSlug,
+        matchContext: hr.matchPassage,       // map matchPassage → matchContext
+        relevance: hr.relevance,
+        score: hr.rrfScore,                  // map rrfScore → score
+      }));
     }
     // existing keyword scoring (unchanged)
   }
+}
+```
+
+> **Note:** `LibrarySearchResult` has `matchContext: string` and `score: number`.
+> The hybrid path maps `matchPassage → matchContext` and `rrfScore → score`.
+> `LegacyKeywordHandler` must perform the reverse: produce `HybridSearchResult`
+> from the legacy scoring, filling `vectorRank: null`, `bm25Rank: null`,
+> `matchHighlight: matchContext` (no bold), `matchSection: null`,
+> `passageOffset: { start: 0, end: 0 }`.
+
+### Composition root wiring (`tool-composition-root.ts`)
+
+Add factory function to construct the full chain and inject into
+`LibrarySearchInteractor`:
+
+```typescript
+export function getSearchHandler(): SearchHandler {
+  const embedder = new LocalEmbedder();
+  const vectorStore = new SQLiteVectorStore(getDb());
+  const bm25IndexStore = new SQLiteBM25IndexStore(getDb());
+  const bm25Scorer = new BM25Scorer();
+
+  const vectorProcessor = new QueryProcessor([
+    new LowercaseStep(),
+    new StopwordStep(STOPWORDS),
+  ]);
+  const bm25Processor = new QueryProcessor([
+    new LowercaseStep(),
+    new StopwordStep(STOPWORDS),
+    new SynonymStep(SYNONYMS),
+  ]);
+
+  const engine = new HybridSearchEngine(
+    embedder, vectorStore, bm25Scorer, bm25IndexStore,
+    vectorProcessor, bm25Processor,
+    { vectorTopN: 50, bm25TopN: 50, rrfK: 60, maxResults: 10 },
+  );
+
+  return new HybridSearchHandler(engine)
+    .setNext(new BM25SearchHandler(bm25Scorer, bm25IndexStore))
+    .setNext(new LegacyKeywordHandler(getBookRepository()))
+    .setNext(new EmptyResultHandler());
 }
 ```
 
@@ -363,7 +516,15 @@ npm run build && npm test   # all existing search tests still pass (VSEARCH-39)
 - [ ] `HybridSearchEngine` with dual query processors (GB-3)
 - [ ] `SearchHandlerChain` with 4 handlers (GoF-1)
 - [ ] Result formatting: highlight, deduplication, relevance assignment
-- [ ] `LibrarySearchInteractor` accepts optional search handler
-- [ ] ~12 new tests passing
+- [ ] `LibrarySearchInteractor` accepts optional search handler (VSEARCH-38)
+- [ ] Composition root wiring: `getSearchHandler()` factory exposed
+- [ ] ~21 new tests passing
 - [ ] Full fallback chain working: hybrid → BM25-only → legacy → empty
-- [ ] `npm run build && npm test` — all tests green
+- [ ] `npm run build && npm test` — all tests green (existing + new)
+
+---
+
+## QA Deviations
+
+_To be populated during implementation QA. Any deviations from this sprint doc or
+the original spec will be documented here with rationale._

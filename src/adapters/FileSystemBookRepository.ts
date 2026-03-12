@@ -1,4 +1,5 @@
 import fs from "fs/promises";
+import type { Dirent } from "fs";
 import path from "path";
 import type { BookRepository } from "../core/use-cases/BookRepository";
 import type { Book } from "../core/entities/library";
@@ -6,6 +7,7 @@ import { Chapter } from "../core/entities/library";
 import { ResourceNotFoundError } from "../core/entities/errors";
 
 export const DEFAULT_DOCS_DIR = "docs";
+const CORPUS_DIR = "_corpus";
 
 import { ExtractPractitioners } from "../core/use-cases/ExtractPractitioners";
 import { AnalyzeChapterChecklist } from "../core/use-cases/AnalyzeChapterChecklist";
@@ -18,82 +20,19 @@ interface BookMeta {
   chaptersDir: string;
 }
 
-const BOOKS: BookMeta[] = [
-  {
-    slug: "software-engineering",
-    title: "Software Engineering",
-    shortTitle: "Software Eng",
-    number: "I",
-    chaptersDir: "software-engineering-book/chapters",
-  },
-  {
-    slug: "design-history",
-    title: "Design History",
-    shortTitle: "Design History",
-    number: "II",
-    chaptersDir: "design-book/chapters",
-  },
-  {
-    slug: "ui-design",
-    title: "UI Design",
-    shortTitle: "UI Design",
-    number: "III",
-    chaptersDir: "ui-design-book/chapters",
-  },
-  {
-    slug: "ux-design",
-    title: "UX Design",
-    shortTitle: "UX Design",
-    number: "IV",
-    chaptersDir: "ux-design-book/chapters",
-  },
-  {
-    slug: "product-management",
-    title: "Product Management",
-    shortTitle: "Product Mgmt",
-    number: "V",
-    chaptersDir: "product-management-book/chapters",
-  },
-  {
-    slug: "accessibility",
-    title: "Accessibility",
-    shortTitle: "Accessibility",
-    number: "VI",
-    chaptersDir: "accessibility-book/chapters",
-  },
-  {
-    slug: "entrepreneurship",
-    title: "Entrepreneurship",
-    shortTitle: "Entrepreneurship",
-    number: "VII",
-    chaptersDir: "entrepreneurship-book/chapters",
-  },
-  {
-    slug: "marketing-branding",
-    title: "Marketing & Branding",
-    shortTitle: "Marketing",
-    number: "VIII",
-    chaptersDir: "marketing-branding-book/chapters",
-  },
-  {
-    slug: "content-strategy",
-    title: "Content Strategy",
-    shortTitle: "Content Strategy",
-    number: "IX",
-    chaptersDir: "content-strategy-book/chapters",
-  },
-  {
-    slug: "data-analytics",
-    title: "Data & Analytics",
-    shortTitle: "Data & Analytics",
-    number: "X",
-    chaptersDir: "data-analytics-book/chapters",
-  },
-];
+interface BookManifest {
+  slug: string;
+  title: string;
+  number: string;
+  sortOrder: number;
+  domain: string[];
+  tags?: string[];
+}
 
 export class FileSystemBookRepository implements BookRepository {
   private readonly practitionerExtractor = new ExtractPractitioners();
   private readonly checklistAnalyzer = new AnalyzeChapterChecklist();
+  private discoveredBooks: BookMeta[] | null = null;
 
   constructor(
     private readonly docsDir: string = path.join(
@@ -102,8 +41,66 @@ export class FileSystemBookRepository implements BookRepository {
     ),
   ) {}
 
+  private async discoverBooks(): Promise<BookMeta[]> {
+    if (this.discoveredBooks) return this.discoveredBooks;
+
+    const corpusDir = path.join(this.docsDir, CORPUS_DIR);
+    let entries: Dirent[];
+    try {
+      entries = await fs.readdir(corpusDir, { withFileTypes: true });
+    } catch {
+      return [];
+    }
+
+    const booksWithOrder: Array<{ meta: BookMeta; sortOrder: number }> = [];
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      try {
+        const raw = await fs.readFile(
+          path.join(corpusDir, entry.name, "book.json"),
+          "utf-8",
+        );
+        const manifest: BookManifest = JSON.parse(raw);
+        if (typeof manifest.slug !== "string" || !manifest.slug) continue;
+        if (typeof manifest.title !== "string" || !manifest.title) continue;
+        if (typeof manifest.number !== "string" || !manifest.number) continue;
+        if (typeof manifest.sortOrder !== "number") continue;
+        if (!Array.isArray(manifest.domain) || manifest.domain.length === 0) continue;
+        // LIBRARIAN-090: directory name must equal slug
+        if (entry.name !== manifest.slug) {
+          console.warn(
+            `Slug mismatch: dir "${entry.name}" vs slug "${manifest.slug}" — skipping`,
+          );
+          continue;
+        }
+        booksWithOrder.push({
+          meta: {
+            slug: manifest.slug,
+            title: manifest.title,
+            shortTitle: manifest.title,
+            number: manifest.number,
+            chaptersDir: path.join(CORPUS_DIR, manifest.slug, "chapters"),
+          },
+          sortOrder: manifest.sortOrder,
+        });
+      } catch {
+        // No book.json or invalid JSON — skip this directory
+      }
+    }
+
+    this.discoveredBooks = booksWithOrder
+      .sort((a, b) => a.sortOrder - b.sortOrder)
+      .map(({ meta }) => meta);
+    return this.discoveredBooks;
+  }
+
+  clearDiscoveryCache(): void {
+    this.discoveredBooks = null;
+  }
+
   async getAllBooks(): Promise<Book[]> {
-    return BOOKS.map((b) => ({
+    const books = await this.discoverBooks();
+    return books.map((b) => ({
       slug: b.slug,
       title: b.title,
       number: b.number,
@@ -111,7 +108,8 @@ export class FileSystemBookRepository implements BookRepository {
   }
 
   async getBook(slug: string): Promise<Book | null> {
-    const book = BOOKS.find((b) => b.slug === slug);
+    const books = await this.discoverBooks();
+    const book = books.find((b) => b.slug === slug);
     if (!book) return null;
     return {
       slug: book.slug,
@@ -121,7 +119,8 @@ export class FileSystemBookRepository implements BookRepository {
   }
 
   async getChaptersByBook(bookSlug: string): Promise<Chapter[]> {
-    const bookMeta = BOOKS.find((b) => b.slug === bookSlug);
+    const books = await this.discoverBooks();
+    const bookMeta = books.find((b) => b.slug === bookSlug);
     if (!bookMeta) throw new ResourceNotFoundError(`Book not found: ${bookSlug}`);
 
     const chaptersDir = path.join(this.docsDir, bookMeta.chaptersDir);
@@ -159,7 +158,8 @@ export class FileSystemBookRepository implements BookRepository {
     bookSlug: string,
     chapterSlug: string,
   ): Promise<Chapter> {
-    const bookMeta = BOOKS.find((b) => b.slug === bookSlug);
+    const books = await this.discoverBooks();
+    const bookMeta = books.find((b) => b.slug === bookSlug);
     if (!bookMeta) {
       throw new ResourceNotFoundError(`Book not found: ${bookSlug}`);
     }

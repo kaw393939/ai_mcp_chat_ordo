@@ -10,6 +10,14 @@ export class CachedBookRepository implements BookRepository {
 
   constructor(private readonly inner: BookRepository) {}
 
+  clearCache(): void {
+    this.allBooksCache = null;
+    this.allChaptersCache = null;
+    this.bookCache.clear();
+    this.chaptersByBookCache.clear();
+    this.chapterCache.clear();
+  }
+
   async getAllBooks(): Promise<Book[]> {
     if (!this.allBooksCache) {
       this.allBooksCache = await this.inner.getAllBooks();

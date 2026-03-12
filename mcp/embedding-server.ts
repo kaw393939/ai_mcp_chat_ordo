@@ -263,7 +263,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     {
       name: "librarian_add_book",
       description:
-        "Add a new book to the corpus. Provide slug, title, number, sortOrder, domain, and optionally chapters.",
+        "Add a new book to the corpus. Provide slug/title/number/sortOrder/domain/chapters, OR a base64-encoded zip archive containing book.json and chapters/.",
       inputSchema: {
         type: "object" as const,
         properties: {
@@ -302,8 +302,12 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
               required: ["slug", "content"],
             },
           },
+          zip_base64: {
+            type: "string",
+            description:
+              "Base64-encoded zip archive containing book.json and chapters/. If provided, all other fields are ignored.",
+          },
         },
-        required: ["slug", "title", "number", "sortOrder", "domain"],
         additionalProperties: false,
       },
     },
@@ -415,13 +419,14 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       result = await librarianAddBook(
         d.librarian,
         a as {
-          slug: string;
-          title: string;
-          number: string;
-          sortOrder: number;
-          domain: string[];
+          slug?: string;
+          title?: string;
+          number?: string;
+          sortOrder?: number;
+          domain?: string[];
           tags?: string[];
           chapters?: Array<{ slug: string; content: string }>;
+          zip_base64?: string;
         },
       );
       break;

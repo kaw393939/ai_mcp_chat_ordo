@@ -1,5 +1,6 @@
 import * as fs from "fs/promises";
 import * as path from "path";
+import AdmZip from "adm-zip";
 import type { VectorStore } from "@/core/search/ports/VectorStore";
 
 // ---------------------------------------------------------------------------
@@ -49,6 +50,199 @@ async function pathExists(p: string): Promise<boolean> {
     return true;
   } catch {
     return false;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Zip safety validation (LIBRARIAN-040, LIBRARIAN-070)
+// ---------------------------------------------------------------------------
+
+const MAX_UNCOMPRESSED_SIZE = 50 * 1024 * 1024; // 50 MB
+const MAX_FILE_COUNT = 500;
+const MAX_COMPRESSION_RATIO = 100;
+
+function validateZipSafety(entries: AdmZip.IZipEntry[]): void {
+  if (entries.length > MAX_FILE_COUNT) {
+    throw new Error(`Zip exceeds maximum file count (${MAX_FILE_COUNT}).`);
+  }
+
+  let totalUncompressed = 0;
+  let totalCompressed = 0;
+
+  for (const entry of entries) {
+    if (entry.entryName.includes("..")) {
+      throw new Error(
+        `Path traversal in zip entry: "${entry.entryName}"`,
+      );
+    }
+    if (path.isAbsolute(entry.entryName)) {
+      throw new Error(
+        `Absolute path in zip entry: "${entry.entryName}"`,
+      );
+    }
+
+    // UTF-8 filename validation
+    try {
+      decodeURIComponent(encodeURIComponent(entry.entryName));
+    } catch {
+      throw new Error(
+        `Non-UTF-8 filename in zip: "${entry.entryName}"`,
+      );
+    }
+
+    // Size tracking
+    totalUncompressed += entry.header.size;
+    totalCompressed += entry.header.compressedSize;
+
+    if (totalUncompressed > MAX_UNCOMPRESSED_SIZE) {
+      throw new Error(
+        `Zip exceeds ${MAX_UNCOMPRESSED_SIZE / 1024 / 1024} MB uncompressed limit.`,
+      );
+    }
+
+    // Symlink check (Unix external attributes)
+    const externalAttr = entry.header.attr >>> 16;
+    if ((externalAttr & 0o170000) === 0o120000) {
+      throw new Error(
+        `Symlinks not allowed in zip: "${entry.entryName}"`,
+      );
+    }
+  }
+
+  // Zip bomb detection
+  if (
+    totalCompressed > 0 &&
+    totalUncompressed / totalCompressed > MAX_COMPRESSION_RATIO
+  ) {
+    throw new Error("Suspicious compression ratio — possible zip bomb.");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// addBookFromZip (Sprint 2 — LIBRARIAN-040)
+// ---------------------------------------------------------------------------
+
+async function addBookFromZip(
+  deps: LibrarianToolDeps,
+  zipBase64: string,
+) {
+  // 1. Decode base64 to Buffer
+  const zipBuffer = Buffer.from(zipBase64, "base64");
+  const zip = new AdmZip(zipBuffer);
+
+  // 2. Validate zip safety
+  const entries = zip.getEntries();
+  validateZipSafety(entries);
+
+  // 3. Find and parse book.json
+  const bookJsonEntry = entries.find((e) => e.entryName === "book.json");
+  if (!bookJsonEntry) {
+    throw new Error("Zip archive must contain book.json at the root.");
+  }
+  const manifest = JSON.parse(
+    bookJsonEntry.getData().toString("utf-8"),
+  ) as Record<string, unknown>;
+  if (!manifest.slug || !manifest.title || !manifest.number) {
+    throw new Error("book.json must contain slug, title, and number.");
+  }
+  if (typeof manifest.sortOrder !== "number") {
+    throw new Error("book.json must contain a numeric sortOrder.");
+  }
+  if (!Array.isArray(manifest.domain) || manifest.domain.length === 0) {
+    throw new Error("book.json must contain a non-empty domain array.");
+  }
+  for (const d of manifest.domain as string[]) {
+    if (!VALID_DOMAINS.has(d)) {
+      throw new Error(
+        `Invalid domain value in zip book.json: "${d}". Valid: ${[...VALID_DOMAINS].join(", ")}`,
+      );
+    }
+  }
+  assertValidSlug(manifest.slug as string);
+
+  // 4. Check slug uniqueness — never overwrite
+  const targetDir = assertSafePath(deps.corpusDir, manifest.slug as string);
+  if (await pathExists(targetDir)) {
+    throw new Error(`Book already exists: ${manifest.slug as string}`);
+  }
+
+  // 5. Extract to temp directory first (atomic)
+  const tmpDir = path.join(
+    deps.corpusDir,
+    `.tmp-${manifest.slug as string}-${Date.now()}`,
+  );
+  try {
+    await fs.mkdir(tmpDir, { recursive: true });
+    const chaptersDir = path.join(tmpDir, "chapters");
+    await fs.mkdir(chaptersDir, { recursive: true });
+
+    // Write book.json
+    await fs.writeFile(
+      path.join(tmpDir, "book.json"),
+      JSON.stringify(manifest, null, 2) + "\n",
+    );
+
+    // Write chapters
+    let chaptersWritten = 0;
+    const seenSlugs = new Set<string>();
+    for (const entry of entries) {
+      if (entry.isDirectory) continue;
+      const match = entry.entryName.match(/^chapters\/(.+)\.md$/);
+      if (!match) continue;
+
+      const chapterSlug = match[1];
+
+      // Validate no nested directories under chapters/
+      if (entry.entryName.split("/").length > 2) {
+        throw new Error(
+          `Nested directories under chapters/ not allowed: "${entry.entryName}"`,
+        );
+      }
+
+      // Validate chapter slug
+      assertValidSlug(chapterSlug);
+
+      // Reject duplicate chapter slugs
+      if (seenSlugs.has(chapterSlug)) {
+        throw new Error(
+          `Duplicate chapter slug in zip: "${chapterSlug}"`,
+        );
+      }
+      seenSlugs.add(chapterSlug);
+
+      const chapterPath = assertSafePath(chaptersDir, `${chapterSlug}.md`);
+      await fs.writeFile(chapterPath, entry.getData().toString("utf-8"));
+      chaptersWritten++;
+    }
+
+    if (chaptersWritten === 0) {
+      throw new Error(
+        "Zip archive must contain at least one chapter in chapters/.",
+      );
+    }
+
+    // 6. Atomic move: temp → final location
+    await fs.rename(tmpDir, targetDir);
+
+    // 7. Clear caches
+    deps.clearCaches();
+
+    return {
+      slug: manifest.slug as string,
+      title: manifest.title as string,
+      directory: `_corpus/${manifest.slug as string}`,
+      chaptersWritten,
+      indexed: false,
+      hint: "Run rebuild_index to make this book searchable.",
+    };
+  } catch (err) {
+    // Rollback: remove temp directory on any failure
+    try {
+      await fs.rm(tmpDir, { recursive: true, force: true });
+    } catch {
+      // Best-effort cleanup
+    }
+    throw err;
   }
 }
 
@@ -214,22 +408,28 @@ export async function librarianGetBook(
 }
 
 // ---------------------------------------------------------------------------
-// librarian_add_book (manual JSON mode — Sprint 1)
+// librarian_add_book (manual JSON + zip dispatch)
 // ---------------------------------------------------------------------------
 
 export async function librarianAddBook(
   deps: LibrarianToolDeps,
   args: {
-    slug: string;
-    title: string;
-    number: string;
-    sortOrder: number;
-    domain: string[];
+    slug?: string;
+    title?: string;
+    number?: string;
+    sortOrder?: number;
+    domain?: string[];
     tags?: string[];
     chapters?: Array<{ slug: string; content: string }>;
+    zip_base64?: string;
   },
 ) {
-  // 1. Validate required fields
+  // Dispatch to zip mode if zip_base64 is provided
+  if (args.zip_base64) {
+    return addBookFromZip(deps, args.zip_base64);
+  }
+
+  // Manual mode — validate required fields
   if (!args.slug || !args.title || !args.number) {
     throw new Error(
       "librarian_add_book requires slug, title, number, sortOrder, and domain.",

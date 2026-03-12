@@ -8,11 +8,67 @@
 
 ---
 
+## Available Assets from Sprint 0 & Sprint 1
+
+Sprint 2 builds on the following files. All imports use the `@/*` path alias
+(mapped to `src/*` in `tsconfig.json`).
+
+### Ports (interfaces — `src/core/search/ports/`)
+
+| Port | File | Key signatures |
+| --- | --- | --- |
+| `Chunker` | `ports/Chunker.ts` | `chunk(sourceId, content, metadata, options?): Chunk[]` |
+| `Embedder` | `ports/Embedder.ts` | `embed(text): Promise<Float32Array>`, `embedBatch(texts): Promise<Float32Array[]>`, `dimensions(): number`, `isReady(): boolean` |
+| `VectorStore` | `ports/VectorStore.ts` | `upsert`, `delete`, `getAll`, `getBySourceId`, `getContentHash`, `getModelVersion`, `count` |
+| `BM25IndexStore` | `ports/BM25IndexStore.ts` | `getIndex`, `saveIndex`, `isStale` |
+
+### Types (`src/core/search/`)
+
+| File | Exports |
+| --- | --- |
+| `types.ts` | `HybridSearchResult` + re-exports of all port types for single-point imports |
+| `ports/Chunker.ts` | `BookChunkMetadata`, `ConversationMetadata`, `ChunkMetadata` (discriminated union), `Chunk`, `ChunkerOptions` |
+| `ports/VectorStore.ts` | `EmbeddingRecord` (14 fields), `VectorQuery` |
+| `ports/BM25IndexStore.ts` | `BM25Index` (with `Map<string, number>` fields) |
+
+### Core implementations (`src/core/search/`)
+
+| File | Exports | Notes |
+| --- | --- | --- |
+| `MarkdownChunker.ts` | `MarkdownChunker` class, `buildPrefix()`, `transformForEmbedding()` | `chunk()` already constructs `embeddingInput` via `transformForEmbedding()` internally — callers do NOT call transform separately |
+| `l2Normalize.ts` | `l2Normalize(vec: Float32Array): Float32Array` | Returns new array; idempotent on unit vectors |
+| `dotSimilarity.ts` | `dotSimilarity(a, b): number` | Simple dot product; equals cosine similarity when inputs are L2-normalized |
+| `BM25Scorer.ts` | `BM25Scorer` class | `score(queryTerms, docTokens, docLength, index)` |
+| `ReciprocalRankFusion.ts` | `ReciprocalRankFusion` class | Rank fusion with configurable k parameter |
+
+### Adapters (`src/adapters/`)
+
+| File | Purpose | Notes |
+| --- | --- | --- |
+| `SQLiteVectorStore.ts` | Production VectorStore | BLOB serialization uses safe `Buffer.copy` before `Float32Array` construction (avoids shared ArrayBuffer alignment issues) |
+| `SQLiteBM25IndexStore.ts` | Production BM25IndexStore | JSON serialization of `Map` objects via `[...map]` spread |
+| `InMemoryVectorStore.ts` | Test double | Full VectorStore impl using `Map<string, EmbeddingRecord>` |
+| `InMemoryBM25IndexStore.ts` | Test double | `isStale()` returns `true` when no index stored |
+| `MockEmbedder.ts` | Test double | Deterministic 384-dim vectors from char codes; **already L2-normalizes** output via `l2Normalize()` — double-normalization in pipeline is idempotent |
+
+### Schema (`src/lib/db/schema.ts`)
+
+Tables `embeddings` (14 columns, 5 indexes) and `bm25_stats` (3 columns) are
+created by `ensureSchema(db)` — already available for `:memory:` test databases.
+
+### Composition root (`src/lib/chat/tool-composition-root.ts`)
+
+Exports `getToolRegistry()`, `getToolExecutor()`, `createToolRegistry(bookRepo)`.
+Currently wires `BookRepository` tools only — Sprint 2 Task 2.5 adds the
+embedding factory accessor here.
+
+---
+
 ## Task 2.1 — LocalEmbedder adapter (ONNX model wrapper)
 
-**What:** Implement the `Embedder` port using `@huggingface/transformers` with
-the `all-MiniLM-L6-v2` ONNX model. The model downloads on first use (~23MB)
-and is cached in `~/.cache/`.
+**What:** Implement the `Embedder` port (defined in `src/core/search/ports/Embedder.ts`)
+using `@huggingface/transformers` with the `all-MiniLM-L6-v2` ONNX model.
+The model downloads on first use (~23MB) and is cached in `~/.cache/`.
 
 | Item | Detail |
 | --- | --- |
@@ -22,9 +78,29 @@ and is cached in `~/.cache/`.
 | **Modify** | `package.json` — new dependency |
 | **Spec** | §4.1, §4.2 |
 
-### Key behaviors
+**Port contract** (from Sprint 0 — `src/core/search/ports/Embedder.ts`):
 
 ```typescript
+interface Embedder {
+  embed(text: string): Promise<Float32Array>;
+  embedBatch(texts: string[]): Promise<Float32Array[]>;
+  dimensions(): number;   // 384 for MiniLM
+  isReady(): boolean;     // true when model loaded and inference available
+}
+```
+
+### Key behaviors
+
+> **Note:** `LocalEmbedder` returns raw (non-normalized) vectors. L2
+> normalization is the **pipeline's** responsibility (step 6 in
+> `EmbeddingPipeline.indexDocument`), using the existing
+> `l2Normalize()` from `@/core/search/l2Normalize`. This matches the
+> `MockEmbedder` test double, which normalizes internally for
+> convenience — but production code normalizes at the pipeline layer.
+
+```typescript
+import type { Embedder } from "@/core/search/ports/Embedder";
+
 class LocalEmbedder implements Embedder {
   private pipeline: FeatureExtractionPipeline | null = null;
 
@@ -36,6 +112,7 @@ class LocalEmbedder implements Embedder {
 
   async embedBatch(texts: string[]): Promise<Float32Array[]> {
     // Batch for efficiency — model handles multiple inputs
+    return Promise.all(texts.map(t => this.embed(t)));
   }
 
   dimensions(): number { return 384; }
@@ -85,15 +162,55 @@ type (GoF-2).
 | **Spec** | §4.3, §4.4, §4.5 |
 | **Reqs** | VSEARCH-22, VSEARCH-23, VSEARCH-25, VSEARCH-42, VSEARCH-45 |
 
-### `ChangeDetector` (UB-2)
+### New types (add to `src/core/search/types.ts` or co-locate with pipeline)
+
+These types are referenced by the pipeline but not yet defined:
 
 ```typescript
+/** Result of indexing a single document */
+interface IndexResult {
+  sourceId: string;
+  status: "created" | "updated" | "unchanged";
+  chunksUpserted: number;
+}
+
+/** Result of a full rebuild across all documents */
+interface RebuildResult {
+  created: number;
+  updated: number;
+  unchanged: number;
+  orphansDeleted: number;
+  totalChunks: number;
+}
+
+/** Input to rebuildAll() — minimal document descriptor */
+interface DocumentInput {
+  sourceId: string;         // e.g. "ux-design/chapter-3"
+  content: string;          // raw markdown
+  contentHash: string;      // SHA-256 hex digest of `content`
+  metadata: ChunkMetadata;  // discriminated union from ports/Chunker.ts
+}
+```
+
+### `ChangeDetector` (UB-2)
+
+Lives in Core (`src/core/search/`) — depends only on the `VectorStore` port
+interface, zero infra imports.
+
+```typescript
+import type { VectorStore } from "./ports/VectorStore";
+
 class ChangeDetector {
   constructor(private vectorStore: VectorStore) {}
 
   hasChanged(sourceId: string, contentHash: string): boolean {
     const storedHash = this.vectorStore.getContentHash(sourceId);
     return storedHash !== contentHash;
+  }
+
+  hasModelChanged(sourceId: string, currentModelVersion: string): boolean {
+    const storedVersion = this.vectorStore.getModelVersion(sourceId);
+    return storedVersion !== null && storedVersion !== currentModelVersion;
   }
 
   findOrphaned(sourceType: string, activeSourceIds: Set<string>): string[] {
@@ -107,6 +224,11 @@ class ChangeDetector {
 ### `EmbeddingPipeline`
 
 ```typescript
+import type { Chunker, ChunkMetadata } from "./ports/Chunker";
+import type { Embedder } from "./ports/Embedder";
+import type { VectorStore, EmbeddingRecord } from "./ports/VectorStore";
+import { l2Normalize } from "./l2Normalize";
+
 class EmbeddingPipeline {
   constructor(
     private chunker: Chunker,
@@ -123,25 +245,44 @@ class EmbeddingPipeline {
     contentHash: string;
     metadata: ChunkMetadata;
   }): Promise<IndexResult> {
-    // 1. Check change via ChangeDetector (UB-2)
-    // 2. Check model version via vectorStore.getModelVersion()
-    // 3. If unchanged & model matches → skip
-    // 4. Chunk content (metadata passed for prefix — GH-2)
-    // 5. Embed all chunks (batched)
-    // 6. L2-normalize each vector (GH-3)
-    // 7. Upsert into VectorStore (delete old first)
+    // 1. Check content change via ChangeDetector.hasChanged() (UB-2)
+    // 2. Check model version via ChangeDetector.hasModelChanged()
+    // 3. If unchanged & model matches → return { status: "unchanged", chunksUpserted: 0 }
+    // 4. Chunk content: this.chunker.chunk(sourceId, content, metadata)
+    //    NOTE: MarkdownChunker.chunk() already calls transformForEmbedding()
+    //    internally — each Chunk.embeddingInput is pre-built with contextual prefix.
+    // 5. Embed all chunks: this.embedder.embedBatch(chunks.map(c => c.embeddingInput))
+    // 6. L2-normalize each vector: l2Normalize(vec) from @/core/search/l2Normalize
+    // 7. Build EmbeddingRecord[] — ID format: `{sourceType}:{sourceId}:{chunkIndex}`
+    // 8. Delete old chunks: this.vectorStore.delete(sourceId)
+    // 9. Upsert new: this.vectorStore.upsert(records)
+    // 10. Return { status: existed ? "updated" : "created", chunksUpserted: records.length }
   }
 
   async rebuildAll(sourceType: string, documents: DocumentInput[]): Promise<RebuildResult> {
-    // For each doc → indexDocument
+    // For each doc → indexDocument()
     // Detect orphans via ChangeDetector.findOrphaned()
+    // Delete orphans via vectorStore.delete()
   }
 }
 ```
 
+**Important — `EmbeddingRecord.id` construction:**
+
+The `id` field is deterministic, built from three components:
+```
+{sourceType}:{sourceId}:{chunkIndex}
+```
+Example: `book_chunk:ux-design/chapter-3:0`, `book_chunk:ux-design/chapter-3:1`
+
+This matches the schema `id TEXT PRIMARY KEY` from Sprint 1 and allows
+`INSERT OR REPLACE` to work correctly on re-indexing.
+
 ### `EmbeddingPipelineFactory` (GoF-2)
 
 ```typescript
+import { MarkdownChunker } from "./MarkdownChunker";
+
 class EmbeddingPipelineFactory {
   constructor(
     private embedder: Embedder,
@@ -150,16 +291,38 @@ class EmbeddingPipelineFactory {
   ) {}
 
   createForSource(sourceType: "book_chunk" | "conversation"): EmbeddingPipeline {
-    const chunker = sourceType === "book_chunk"
-      ? new MarkdownChunker()
-      : new ConversationChunker();  // future
+    if (sourceType === "conversation") {
+      throw new Error("ConversationChunker not yet implemented");
+    }
+    const chunker = new MarkdownChunker();
     const changeDetector = new ChangeDetector(this.vectorStore);
     return new EmbeddingPipeline(chunker, this.embedder, this.vectorStore, changeDetector, this.modelVersion);
   }
 }
 ```
 
+> **Sprint 0/1 alignment note:** `ConversationChunker` does not exist yet
+> (future work). The factory throws for unsupported source types rather than
+> silently returning a broken pipeline.
+
 ### Tests (`tests/search/embedding-pipeline.test.ts`)
+
+**Test setup pattern** — use the test doubles from `src/adapters/`:
+
+```typescript
+import { MockEmbedder } from "@/adapters/MockEmbedder";
+import { InMemoryVectorStore } from "@/adapters/InMemoryVectorStore";
+import { MarkdownChunker } from "@/core/search/MarkdownChunker";
+import { ChangeDetector } from "@/core/search/ChangeDetector";
+import { EmbeddingPipeline } from "@/core/search/EmbeddingPipeline";
+import { EmbeddingPipelineFactory } from "@/core/search/EmbeddingPipelineFactory";
+import type { BookChunkMetadata } from "@/core/search/ports/Chunker";
+```
+
+> **Note:** `MockEmbedder` already L2-normalizes its output internally. When the
+> pipeline also calls `l2Normalize()`, the result is unchanged (idempotent on
+> unit vectors). Tests should verify the pipeline normalizes, not rely on mock
+> behavior.
 
 | Test ID | Scenario |
 | --- | --- |
@@ -184,7 +347,9 @@ npm run build
 ## Task 2.3 — EmbeddingValidator (build-time quality checks — GH-1)
 
 **What:** Implement the build-time embedding quality validation. Embeds known
-semantic pairs and asserts similarity thresholds.
+semantic pairs and asserts similarity thresholds. Uses `dotSimilarity()` from
+Sprint 0 (`@/core/search/dotSimilarity`) and `l2Normalize()` from Sprint 0
+(`@/core/search/l2Normalize`) to compute cosine similarity.
 
 | Item | Detail |
 | --- | --- |
@@ -196,10 +361,20 @@ semantic pairs and asserts similarity thresholds.
 ### Key behaviors
 
 ```typescript
+import type { Embedder } from "./ports/Embedder";
+import { l2Normalize } from "./l2Normalize";
+import { dotSimilarity } from "./dotSimilarity";
+
 interface ValidationPair {
   textA: string;
   textB: string;
   expectedSimilar: boolean;
+}
+
+interface ValidationResult {
+  passed: number;
+  failed: number;
+  details: string[];      // human-readable per-pair results
 }
 
 const VALIDATION_PAIRS: ValidationPair[] = [
@@ -213,7 +388,11 @@ const VALIDATION_PAIRS: ValidationPair[] = [
 async function validateEmbeddingQuality(embedder: Embedder): Promise<ValidationResult> {
   const SIMILAR_THRESHOLD = 0.7;
   const DISSIMILAR_THRESHOLD = 0.3;
-  // Embed pairs, L2-normalize, compute dot product, check thresholds
+  // For each pair:
+  //   1. embedder.embed(textA), embedder.embed(textB)
+  //   2. l2Normalize each vector
+  //   3. dotSimilarity(normA, normB) → cosine similarity
+  //   4. Check against threshold
 }
 ```
 
@@ -244,21 +423,59 @@ rebuild. Includes quality validation.
 | **Spec** | §9.1–9.4 |
 | **Reqs** | VSEARCH-18, VSEARCH-19, VSEARCH-20, VSEARCH-21 |
 
+### Key imports
+
+```typescript
+// Adapters (production wiring)
+import { LocalEmbedder } from "@/adapters/LocalEmbedder";
+import { SQLiteVectorStore } from "@/adapters/SQLiteVectorStore";
+import { SQLiteBM25IndexStore } from "@/adapters/SQLiteBM25IndexStore";
+
+// Core orchestration (from this sprint)
+import { EmbeddingPipelineFactory } from "@/core/search/EmbeddingPipelineFactory";
+import { EmbeddingValidator } from "@/core/search/EmbeddingValidator";
+
+// Existing infrastructure
+import { getBookRepository } from "@/adapters/RepositoryFactory";
+import { getDb } from "@/lib/db";  // or however the DB singleton is accessed
+```
+
+### Content hash computation
+
+The build script must compute a SHA-256 hex digest of each chapter's raw
+markdown content. This is the `contentHash` passed to `indexDocument()`:
+
+```typescript
+import { createHash } from "crypto";
+
+function sha256(content: string): string {
+  return createHash("sha256").update(content).digest("hex");
+}
+```
+
 ### Script flow
 
 ```text
 1. Load embedding model (first run downloads ~23MB ONNX)
 2. Check model version against stored embeddings (GH-4)
-3. Load all chapters via FileSystemBookRepository
+3. Load all chapters via getBookRepository() (CachedBookRepository wrapping FileSystemBookRepository)
 4. For each chapter:
-   a. ChangeDetector.hasChanged(sourceId, hash) (UB-2)
+   a. ChangeDetector.hasChanged(sourceId, sha256(content)) (UB-2)
    b. If unchanged & model matches → skip
-   c. Chunk → transform → embed → L2-normalize → upsert
+   c. Pipeline handles: chunk → embed → L2-normalize → upsert
+      (MarkdownChunker.chunk() builds embeddingInput internally via transformForEmbedding)
 5. ChangeDetector.findOrphaned() → delete orphans
 6. Rebuild BM25 index → persist via BM25IndexStore (UB-3)
 7. Validate embedding quality (GH-1)
 8. Print stats
 ```
+
+> **Sprint 1 alignment note:** The chunker already builds `embeddingInput` with
+> contextual prefix inside `chunk()`. The build script does NOT call
+> `transformForEmbedding()` directly — that's encapsulated in `MarkdownChunker`.
+>
+> **Sprint 0 alignment note:** `l2Normalize()` is called by the pipeline (not
+> the build script) after `embedder.embedBatch()` returns raw vectors.
 
 ### Package scripts
 
@@ -299,14 +516,27 @@ code can on-demand embed a single document without a full rebuild.
 
 | Item | Detail |
 | --- | --- |
-| **Add to** | `src/lib/chat/tool-composition-root.ts` (factory accessor only — no tool changes yet) |
+| **Modify** | `src/lib/chat/tool-composition-root.ts` (add factory + pipeline accessors) |
 | **Spec** | §10.1–10.3 |
 | **Reqs** | VSEARCH-22 |
+
+### Current state of composition root
+
+The file currently exports `getToolRegistry()`, `getToolExecutor()`, and
+`createToolRegistry(bookRepo)`. It imports from `@/adapters/RepositoryFactory`
+and wires book tools. Sprint 2 adds embedding infrastructure alongside.
 
 ### Integration point
 
 ```typescript
+import { LocalEmbedder } from "@/adapters/LocalEmbedder";
+import { SQLiteVectorStore } from "@/adapters/SQLiteVectorStore";
+import { EmbeddingPipelineFactory } from "@/core/search/EmbeddingPipelineFactory";
+import type { EmbeddingPipeline } from "@/core/search/EmbeddingPipeline";
+
 const MODEL_VERSION = "all-MiniLM-L6-v2@1.0";
+
+let factory: EmbeddingPipelineFactory | null = null;
 
 export function getEmbeddingPipelineFactory(): EmbeddingPipelineFactory {
   if (!factory) {
@@ -324,6 +554,10 @@ export function getBookPipeline(): EmbeddingPipeline {
 }
 ```
 
+> **Note:** `getDb()` must be resolved — check the existing DB access pattern
+> in the codebase (likely `src/lib/db/index.ts` or similar). The SQLite stores
+> from Sprint 1 accept a `Database` instance from `better-sqlite3`.
+
 ### Tests
 
 | Test ID | Scenario |
@@ -340,13 +574,23 @@ npm run build && npm test   # all tests green — no runtime changes
 
 ## Sprint 2 — Completion Checklist
 
-- [ ] `@huggingface/transformers` installed, `LocalEmbedder` wraps ONNX runtime
-- [ ] `ChangeDetector` handles hash comparison + orphan detection (UB-2)
-- [ ] `EmbeddingPipeline` orchestrates chunk → embed → normalize → store
-- [ ] `EmbeddingPipelineFactory` constructs pipelines per source type (GoF-2)
-- [ ] `EmbeddingValidator` validates embedding quality at build time (GH-1)
-- [ ] `build-search-index.ts` runs incrementally by default
-- [ ] On-demand API accessible via composition root
-- [ ] ~10 new tests passing
-- [ ] `npm run build:search-index` populates `embeddings` table with real vectors
-- [ ] `npm run build && npm test` — all tests green
+- [x] `@huggingface/transformers` installed, `LocalEmbedder` wraps ONNX runtime
+- [x] `ChangeDetector` handles hash comparison + model version check + orphan detection (UB-2)
+- [x] `EmbeddingPipeline` orchestrates chunk → embed → L2-normalize → store
+- [x] `EmbeddingPipelineFactory` constructs pipelines per source type (GoF-2); throws for unimplemented `ConversationChunker`
+- [x] `EmbeddingValidator` validates embedding quality at build time using `dotSimilarity` + `l2Normalize` (GH-1)
+- [x] `build-search-index.ts` runs incrementally by default; uses `sha256()` for content hashing
+- [x] On-demand API accessible via composition root (`getBookPipeline()`)
+- [x] `IndexResult`, `RebuildResult`, `DocumentInput` types defined
+- [x] `EmbeddingRecord.id` uses deterministic format: `{sourceType}:{sourceId}:{chunkIndex}`
+- [x] ~13 new tests passing (cumulative: 249 total tests across 53 files)
+- [x] `npm run build:search-index` populates `embeddings` table with real vectors (574 chunks, 104 chapters)
+- [x] `npm run build && npm test` — all tests green
+
+### Alignment notes (Sprint 0/1 → Sprint 2)
+
+- Test doubles are in `src/adapters/` (not `src/core/search/test-doubles/`)
+- `MockEmbedder` already L2-normalizes — pipeline double-normalization is idempotent
+- `MarkdownChunker.chunk()` builds `embeddingInput` internally — pipeline does not call `transformForEmbedding()` directly
+- `SQLiteVectorStore.deserializeEmbedding()` uses defensive `Buffer.copy` (safer than spec's naive version)
+- Book chapters loaded via `getBookRepository()` (returns `CachedBookRepository` wrapping `FileSystemBookRepository`)

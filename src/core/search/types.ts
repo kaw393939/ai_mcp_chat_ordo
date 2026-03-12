@@ -14,6 +14,30 @@ export interface HybridSearchResult {
   passageOffset: { start: number; end: number };
 }
 
+/** Result of indexing a single document */
+export interface IndexResult {
+  sourceId: string;
+  status: "created" | "updated" | "unchanged";
+  chunksUpserted: number;
+}
+
+/** Result of a full rebuild across all documents */
+export interface RebuildResult {
+  created: number;
+  updated: number;
+  unchanged: number;
+  orphansDeleted: number;
+  totalChunks: number;
+}
+
+/** Input to rebuildAll() — minimal document descriptor */
+export interface DocumentInput {
+  sourceId: string;
+  content: string;
+  contentHash: string;
+  metadata: import("./ports/Chunker").ChunkMetadata;
+}
+
 // Re-export all port types for convenient single-point imports
 export type {
   BookChunkMetadata,

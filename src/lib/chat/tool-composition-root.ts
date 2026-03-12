@@ -6,6 +6,12 @@ import { RoleAwareSearchFormatter } from "@/core/tool-registry/ToolResultFormatt
 import { getBookRepository } from "@/adapters/RepositoryFactory";
 import type { BookRepository } from "@/core/use-cases/BookRepository";
 
+import { LocalEmbedder } from "@/adapters/LocalEmbedder";
+import { SQLiteVectorStore } from "@/adapters/SQLiteVectorStore";
+import { EmbeddingPipelineFactory } from "@/core/search/EmbeddingPipelineFactory";
+import type { EmbeddingPipeline } from "@/core/search/EmbeddingPipeline";
+import { getDb } from "@/lib/db";
+
 import { calculatorTool } from "@/core/use-cases/tools/calculator.tool";
 import { setThemeTool } from "@/core/use-cases/tools/set-theme.tool";
 import { adjustUiTool } from "@/core/use-cases/tools/adjust-ui.tool";
@@ -20,6 +26,9 @@ import { createGetBookSummaryTool } from "@/core/use-cases/tools/get-book-summar
 
 let registry: ToolRegistry | null = null;
 let composedExecute: ToolExecuteFn | null = null;
+let embeddingFactory: EmbeddingPipelineFactory | null = null;
+
+const MODEL_VERSION = "all-MiniLM-L6-v2@1.0";
 
 export function createToolRegistry(bookRepo: BookRepository): ToolRegistry {
   const reg = new ToolRegistry(new RoleAwareSearchFormatter());
@@ -58,4 +67,19 @@ export function getToolExecutor(): ToolExecuteFn {
     );
   }
   return composedExecute;
+}
+
+export function getEmbeddingPipelineFactory(): EmbeddingPipelineFactory {
+  if (!embeddingFactory) {
+    embeddingFactory = new EmbeddingPipelineFactory(
+      new LocalEmbedder(),
+      new SQLiteVectorStore(getDb()),
+      MODEL_VERSION,
+    );
+  }
+  return embeddingFactory;
+}
+
+export function getBookPipeline(): EmbeddingPipeline {
+  return getEmbeddingPipelineFactory().createForSource("book_chunk");
 }

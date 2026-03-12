@@ -6,6 +6,8 @@
     "prestart": "npm run validate:env",
     "dev": "next dev",
     "build": "next build",
+    "build:search-index": "tsx scripts/build-search-index.ts",
+    "build:search-index:force": "tsx scripts/build-search-index.ts --force",
     "release:prepare": "npm run build && node scripts/generate-release-manifest.mjs",
     "release:verify": "node scripts/validate-release-manifest.mjs",
     "run": "npm run release:verify && npm run start",
@@ -30,6 +32,7 @@
   },
   "dependencies": {
     "@anthropic-ai/sdk": "^0.78.0",
+    "@huggingface/transformers": "^3.8.1",
     "@modelcontextprotocol/sdk": "^1.27.1",
     "@radix-ui/react-dialog": "^1.1.15",
     "bcryptjs": "^3.0.3",

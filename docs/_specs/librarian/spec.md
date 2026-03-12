@@ -1,4 +1,4 @@
-# Corpus Management — System Spec
+# Librarian — System Spec
 
 > **Status:** Draft v2.0
 > **Date:** 2026-03-12
@@ -57,7 +57,7 @@ no mechanism to accept, validate, and unpack such archives into the corpus.
    subdirectory of `_corpus/` is a book. No code changes to add content.
 2. **Single embeddable root** — `docs/_corpus/` is the only directory the
    embedding pipeline reads. Everything outside it is project documentation.
-3. **Admin-only operations** — corpus mutation tools require `ADMIN` role,
+3. **Admin-only operations** — librarian tools require `ADMIN` role,
    enforced by existing RBAC middleware.
 4. **Incremental by default** — existing SHA-256 change detection continues to
    work. Only changed content is re-embedded on rebuild.
@@ -198,7 +198,7 @@ remains unchanged.
 ### 4.2 `CachedBookRepository`
 
 **Change:** Add a `clearCache()` method that resets all maps and cached arrays.
-Called by the corpus management tools after adding or removing content, so the
+Called by the librarian tools after adding or removing content, so the
 next request picks up the new filesystem state.
 
 ```typescript
@@ -214,12 +214,12 @@ clearCache(): void {
 ### 4.3 `RepositoryFactory`
 
 No change to the factory itself, but the singleton `CachedBookRepository`
-instance must be accessible to the corpus management tools so they can call
+instance must be accessible to the librarian tools so they can call
 `clearCache()` after mutations.
 
 ---
 
-## 5. MCP Corpus Management Tools
+## 5. MCP Librarian Tools
 
 ### 5.1 Tool Surface
 
@@ -438,7 +438,7 @@ filesystem access, the vector store (for cleanup), and a cache-clear callback.
 
 ### 8.1 RBAC
 
-All corpus tools are registered with `roles: ["ADMIN"]`. The MCP embedding
+All librarian tools are registered with `roles: ["ADMIN"]`. The MCP embedding
 server runs as a privileged process (admin-level), so RBAC is enforced at the
 tool registration level, not at the transport level.
 
@@ -519,9 +519,9 @@ change — all existing tests pass, build pipeline works, search works.
 
 **Deliverable:** ~307 existing tests still pass, build works against `_corpus/`.
 
-### Sprint 1 — MCP Corpus Tools
+### Sprint 1 — MCP Librarian Tools
 
-**Goal:** Add 6 corpus management tools to the MCP embedding server. Admin
+**Goal:** Add 6 librarian tools to the MCP embedding server. Admin
 can list, add, and remove books/chapters through the LLM tool interface.
 
 | Task | Description |
@@ -558,7 +558,7 @@ in scope for this spec.
 
 ### 11.3 Web Admin UI
 
-The corpus tools are exposed via MCP, which means they're accessible through
+The librarian tools are exposed via MCP, which means they're accessible through
 the admin chat interface (LLM calls the tools). A dedicated admin web UI for
-corpus management (drag-and-drop zip upload, visual book listing) is a future
+corpus browsing (drag-and-drop zip upload, visual book listing) is a future
 enhancement that would call the same underlying tool functions.

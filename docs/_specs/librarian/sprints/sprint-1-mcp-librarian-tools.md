@@ -18,8 +18,8 @@
 | `CachedBookRepository.clearCache()` | Busts all repository caches | Called after every mutation |
 | `VectorStore.delete(sourceId)` | Removes embeddings for a source | `librarian_remove_book`, `librarian_remove_chapter` |
 | `VectorStore.count(sourceType?)` | Counts stored embeddings | `librarian_list` checks indexing status |
-| MCP embedding server (`mcp/embedding-server.ts`) | Existing 6-tool server | Corpus tools registered alongside |
-| `mcp/embedding-tool.ts` pattern | Extracted testable tool functions | Corpus tools follow same pattern |
+| MCP embedding server (`mcp/embedding-server.ts`) | Existing 6-tool server | Librarian tools registered alongside |
+| `mcp/embedding-tool.ts` pattern | Extracted testable tool functions | Librarian tools follow same pattern |
 | Admin RBAC | `roles: ["ADMIN"]` on tool descriptors | Librarian tools are admin-only |
 
 ---
@@ -594,7 +594,7 @@ npm run build                 # build discovers corpus, embeds, BM25 indexes
 |-------|-------|
 | Existing (Sprints 0–5 vector search) | 307 |
 | Sprint 0 (discovery + cache) | ~10 |
-| Sprint 1 (corpus tools) | ~27 |
+| Sprint 1 (librarian tools) | ~27 |
 | **Total** | **~344** |
 
 ---

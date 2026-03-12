@@ -197,7 +197,7 @@ export class FileSystemBookRepository implements BookRepository {
     return this.discoveredBooks;
   }
 
-  // clearDiscoveryCache() — called by corpus tools after mutations
+  // clearDiscoveryCache() — called by librarian tools after mutations
   clearDiscoveryCache(): void {
     this.discoveredBooks = null;
   }
@@ -237,7 +237,7 @@ npm run build        # build pipeline discovers _corpus/ and works
 
 ## Task 0.4 — Add `clearCache()` to `CachedBookRepository`
 
-**What:** Add a method to reset all cached data, so corpus management tools
+**What:** Add a method to reset all cached data, so librarian tools
 can force re-discovery after adding or removing content.
 
 ### Changes to `CachedBookRepository`

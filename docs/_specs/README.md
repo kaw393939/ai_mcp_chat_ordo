@@ -271,7 +271,7 @@ These principles govern all specs and implementations in this project:
 
 7. **RBAC** — Four roles: `ANONYMOUS`, `AUTHENTICATED`, `STAFF`, `ADMIN`.
    Tools declare their allowed roles. `RbacGuardMiddleware` enforces access.
-   Admin-only operations (like corpus management) require `ADMIN`.
+   Admin-only operations (like librarian tools) require `ADMIN`.
 
 ---
 

@@ -8,6 +8,13 @@ import { ResourceNotFoundError } from "../core/entities/errors";
 
 export const DEFAULT_DOCS_DIR = "docs";
 const CORPUS_DIR = "_corpus";
+const VALID_DOMAINS = new Set([
+  "teaching",
+  "sales",
+  "customer-service",
+  "reference",
+  "internal",
+]);
 
 import { ExtractPractitioners } from "../core/use-cases/ExtractPractitioners";
 import { AnalyzeChapterChecklist } from "../core/use-cases/AnalyzeChapterChecklist";
@@ -66,6 +73,7 @@ export class FileSystemBookRepository implements BookRepository {
         if (typeof manifest.number !== "string" || !manifest.number) continue;
         if (typeof manifest.sortOrder !== "number") continue;
         if (!Array.isArray(manifest.domain) || manifest.domain.length === 0) continue;
+        if (manifest.domain.some((d: string) => !VALID_DOMAINS.has(d))) continue;
         // LIBRARIAN-090: directory name must equal slug
         if (entry.name !== manifest.slug) {
           console.warn(

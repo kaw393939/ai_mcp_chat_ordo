@@ -129,6 +129,26 @@ describe("FileSystemBookRepository — auto-discovery", () => {
     expect(books).toHaveLength(0);
   });
 
+  it("skips book.json with invalid domain values", async () => {
+    const badDir = path.join(corpusDir(), "bad-domain");
+    await fs.mkdir(path.join(badDir, "chapters"), { recursive: true });
+    await fs.writeFile(
+      path.join(badDir, "book.json"),
+      JSON.stringify({
+        slug: "bad-domain",
+        title: "Bad Domain",
+        number: "I",
+        sortOrder: 1,
+        domain: ["teaching", "invalid-value"],
+      }),
+    );
+
+    const repo = new FileSystemBookRepository(tmpDir);
+    const books = await repo.getAllBooks();
+
+    expect(books).toHaveLength(0);
+  });
+
   it("skips when slug ≠ directory name [LIBRARIAN-090]", async () => {
     // Directory is "wrong-dir" but slug says "correct-slug"
     const badDir = path.join(corpusDir(), "wrong-dir");

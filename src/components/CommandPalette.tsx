@@ -46,16 +46,16 @@ export default function CommandPalette() {
       new ThemeCommand("theme-fluid", "Set Theme: Modern Fluid", "Themes", setTheme, "fluid"),
 
       // Books (Shortcuts to main categories)
-      new NavigationCommand("book-ux", "Book: UX Design", "Books", navigate, "/books/ux-design-book"),
-      new NavigationCommand("book-ui", "Book: UI Design", "Books", navigate, "/books/ui-design-book"),
-      new NavigationCommand("book-se", "Book: Software Engineering", "Books", navigate, "/books/software-engineering-book"),
-      new NavigationCommand("book-pm", "Book: Product Management", "Books", navigate, "/books/product-management-book"),
-      new NavigationCommand("book-marketing", "Book: Marketing & Branding", "Books", navigate, "/books/marketing-branding-book"),
-      new NavigationCommand("book-data", "Book: Data Analytics", "Books", navigate, "/books/data-analytics-book"),
-      new NavigationCommand("book-content", "Book: Content Strategy", "Books", navigate, "/books/content-strategy-book"),
-      new NavigationCommand("book-access", "Book: Accessibility", "Books", navigate, "/books/accessibility-book"),
-      new NavigationCommand("book-entre", "Book: Entrepreneurship", "Books", navigate, "/books/entrepreneurship-book"),
-      new NavigationCommand("book-design", "Book: Design Systems", "Books", navigate, "/books/design-book"),
+      new NavigationCommand("book-ux", "Book: UX Design", "Books", navigate, "/books/ux-design"),
+      new NavigationCommand("book-ui", "Book: UI Design", "Books", navigate, "/books/ui-design"),
+      new NavigationCommand("book-se", "Book: Software Engineering", "Books", navigate, "/books/software-engineering"),
+      new NavigationCommand("book-pm", "Book: Product Management", "Books", navigate, "/books/product-management"),
+      new NavigationCommand("book-marketing", "Book: Marketing & Branding", "Books", navigate, "/books/marketing-branding"),
+      new NavigationCommand("book-data", "Book: Data Analytics", "Books", navigate, "/books/data-analytics"),
+      new NavigationCommand("book-content", "Book: Content Strategy", "Books", navigate, "/books/content-strategy"),
+      new NavigationCommand("book-access", "Book: Accessibility", "Books", navigate, "/books/accessibility"),
+      new NavigationCommand("book-entre", "Book: Entrepreneurship", "Books", navigate, "/books/entrepreneurship"),
+      new NavigationCommand("book-design", "Book: Design History", "Books", navigate, "/books/design-history"),
     ];
   }, [router, setTheme]);
 

@@ -1,10 +1,13 @@
-# Sprint 1 — MCP Librarian Tools
+# Sprint 1 — MCP Librarian Tools (Core)
 
-> **Goal:** Add 6 librarian tools to the MCP embedding server. Admins
-> can list, inspect, add, and remove books/chapters through the LLM chat
-> interface or any MCP client.
+> **Goal:** Add 6 librarian tools to the MCP embedding server (manual mode
+> only — no zip). Admins can list, inspect, add, and remove books/chapters
+> through the LLM chat interface or any MCP client.
 > **Spec ref:** §5 (tool surface), §7 (extracted tool logic), §8 (security)
-> **Prerequisite:** Sprint 0 complete (auto-discovery working, ~317 tests passing)
+> **Prerequisite:** Sprint 0 complete (auto-discovery working, ~319 tests passing)
+>
+> **Scope note:** Zip import mode is deferred to Sprint 2. This sprint
+> implements `librarian_add_book` with manual JSON args only.
 
 ---
 
@@ -13,14 +16,14 @@
 | Asset | Purpose | Sprint 1 Use |
 |-------|---------|-------------|
 | `docs/_corpus/` | Corpus root — auto-discovered by `FileSystemBookRepository` | All tools read/write here |
-| `book.json` convention | Manifest per book | `librarian_add_book` creates these, `librarian_list` reads them |
+| `book.json` convention | Manifest per book (dir = slug, with `sortOrder`) | `librarian_add_book` creates these, `librarian_list` reads them |
 | `FileSystemBookRepository.clearDiscoveryCache()` | Busts book discovery cache | Called after every mutation |
 | `CachedBookRepository.clearCache()` | Busts all repository caches | Called after every mutation |
 | `VectorStore.delete(sourceId)` | Removes embeddings for a source | `librarian_remove_book`, `librarian_remove_chapter` |
-| `VectorStore.count(sourceType?)` | Counts stored embeddings | `librarian_list` checks indexing status |
+| `VectorStore.getBySourceId(sourceId)` | Checks if embeddings exist | `librarian_list`, `librarian_get_book` check indexing status |
 | MCP embedding server (`mcp/embedding-server.ts`) | Existing 6-tool server | Librarian tools registered alongside |
 | `mcp/embedding-tool.ts` pattern | Extracted testable tool functions | Librarian tools follow same pattern |
-| Admin RBAC | `roles: ["ADMIN"]` on tool descriptors | Librarian tools are admin-only |
+| Admin RBAC | `roles: ["ADMIN"]` on tool descriptors | Librarian tools are admin-only `[LIBRARIAN-030]` |
 
 ---
 
@@ -75,14 +78,14 @@ export async function librarianGetBook(
   }>;
 }>
 
-// --- librarian_add_book (manual + zip) ---
+// --- librarian_add_book (manual only — zip is Sprint 2) ---
 export async function librarianAddBook(
   deps: LibrarianToolDeps,
   args: {
-    slug?: string; title?: string; number?: string;
-    domain?: string[]; tags?: string[];
+    slug: string; title: string; number: string;
+    sortOrder: number;
+    domain: string[]; tags?: string[];
     chapters?: Array<{ slug: string; content: string }>;
-    zip_base64?: string;
   },
 ): Promise<{
   slug: string; title: string;
@@ -114,20 +117,20 @@ export async function librarianRemoveChapter(
 ### Security helpers (internal)
 
 ```typescript
-// Validates that a resolved path is inside corpusDir — prevents path traversal
+// LIBRARIAN-070: path.relative() approach prevents sibling-prefix attacks
 function assertSafePath(corpusDir: string, ...segments: string[]): string {
   const resolved = path.resolve(corpusDir, ...segments);
-  if (!resolved.startsWith(path.resolve(corpusDir) + path.sep) &&
-      resolved !== path.resolve(corpusDir)) {
+  const rel = path.relative(path.resolve(corpusDir), resolved);
+  if (rel.startsWith("..") || path.isAbsolute(rel)) {
     throw new Error("Path traversal detected — path escapes corpus directory.");
   }
   return resolved;
 }
 
-// Validates slug format — alphanumeric, hyphens, no dots or slashes
+// LIBRARIAN-080: validates slug format — lowercase kebab-case
 function assertValidSlug(slug: string): void {
   if (!/^[a-z0-9][a-z0-9-]*[a-z0-9]$/.test(slug) || slug.length > 100) {
-    throw new Error(`Invalid slug: "${slug}". Must be lowercase alphanumeric with hyphens.`);
+    throw new Error(`Invalid slug: "${slug}". Must be lowercase alphanumeric with hyphens, max 100 chars.`);
   }
 }
 ```
@@ -180,13 +183,14 @@ npx tsc --noEmit
 },
 {
   name: "librarian_add_book",
-  description: "Add a new book to the corpus. Provide slug/title/number/domain/chapters, or a base64-encoded zip archive containing book.json and chapters/.",
+  description: "Add a new book to the corpus. Provide slug, title, number, sortOrder, domain, and optionally chapters.",
   inputSchema: {
     type: "object" as const,
     properties: {
-      slug: { type: "string", description: "Book slug (lowercase, hyphens)." },
+      slug: { type: "string", description: "Book slug (lowercase kebab-case). Becomes the directory name." },
       title: { type: "string", description: "Book title." },
-      number: { type: "string", description: "Display number (e.g. 'XI')." },
+      number: { type: "string", description: "Display number (e.g. 'XI'). Decorative only." },
+      sortOrder: { type: "number", description: "Numeric sort order." },
       domain: {
         type: "array",
         description: "Content domains (e.g. ['teaching', 'reference']).",
@@ -194,7 +198,7 @@ npx tsc --noEmit
       },
       tags: {
         type: "array",
-        description: "Optional freeform tags.",
+        description: "Optional freeform tags (lowercase kebab-case).",
         items: { type: "string" },
       },
       chapters: {
@@ -209,14 +213,14 @@ npx tsc --noEmit
           required: ["slug", "content"],
         },
       },
-      zip_base64: { type: "string", description: "Base64-encoded zip archive containing book.json and chapters/." },
     },
+    required: ["slug", "title", "number", "sortOrder", "domain"],
     additionalProperties: false,
   },
 },
 {
   name: "librarian_add_chapter",
-  description: "Add a chapter to an existing book in the corpus.",
+  description: "Add a chapter to an existing book in the corpus. Overwrites if the chapter already exists.",
   inputSchema: {
     type: "object" as const,
     properties: {
@@ -272,15 +276,15 @@ npx tsc --noEmit
 1. Read `_corpus/` directory entries
 2. For each directory with a valid `book.json`:
    - Count `chapters/*.md` files
-   - Check `vectorStore.count(sourceType)` or check if any embeddings exist
-     for `{slug}/*` pattern
+   - Check if any embeddings exist for `{slug}/*` chapters
 3. Return sorted inventory
 
 ### `librarianGetBook` implementation
 
-1. Find the book directory by matching `book.json` slug
+1. Find the book directory by matching slug (dir = slug per `LIBRARIAN-090`)
 2. Read all `chapters/*.md` filenames
-3. For each chapter, extract title from first `# ` heading
+3. For each chapter, extract title from first `# ` heading (fall back to
+   filename if absent)
 4. Check embedding status per chapter via `vectorStore.getBySourceId()`
 5. Return book details with chapter listing
 
@@ -301,41 +305,54 @@ npx vitest run tests/corpus/librarian-tools.test.ts   # targeted tests
 ## Task 1.4 — Implement `librarian_add_book` (manual JSON mode)
 
 **What:** Create a new book directory with `book.json` and chapters.
+Zip mode is deferred to Sprint 2.
 
 ### Implementation
 
 ```typescript
-export async function librarianAddBook(deps, args) {
-  // 1. Determine source: zip or manual
-  if (args.zip_base64) return addBookFromZip(deps, args.zip_base64);
-
-  // 2. Validate required fields
+export async function librarianAddBook(
+  deps: LibrarianToolDeps,
+  args: {
+    slug: string; title: string; number: string;
+    sortOrder: number;
+    domain: string[]; tags?: string[];
+    chapters?: Array<{ slug: string; content: string }>;
+  },
+) {
+  // 1. Validate required fields
   if (!args.slug || !args.title || !args.number) {
-    throw new Error("librarian_add_book requires slug, title, number, and domain.");
+    throw new Error("librarian_add_book requires slug, title, number, sortOrder, and domain.");
+  }
+  if (typeof args.sortOrder !== "number") {
+    throw new Error("sortOrder must be a number.");
   }
   assertValidSlug(args.slug);
 
-  // 3. Check slug uniqueness
-  const bookDir = assertSafePath(deps.corpusDir, `${args.slug}-book`);
+  // 2. LIBRARIAN-090: directory = slug
+  const bookDir = assertSafePath(deps.corpusDir, args.slug);
   if (await pathExists(bookDir)) {
-    throw new Error(`Book directory already exists: ${args.slug}-book`);
+    throw new Error(`Book already exists: ${args.slug}`);
   }
 
-  // 4. Create directory structure
+  // 3. Create directory structure
   const chaptersDir = path.join(bookDir, "chapters");
   await fs.mkdir(chaptersDir, { recursive: true });
 
-  // 5. Write book.json
+  // 4. Write book.json
   const manifest = {
-    slug: args.slug, title: args.title, number: args.number,
-    domain: args.domain, ...(args.tags ? { tags: args.tags } : {}),
+    slug: args.slug,
+    title: args.title,
+    number: args.number,
+    sortOrder: args.sortOrder,
+    domain: args.domain,
+    ...(args.tags ? { tags: args.tags } : {}),
   };
   await fs.writeFile(
     path.join(bookDir, "book.json"),
     JSON.stringify(manifest, null, 2) + "\n",
   );
 
-  // 6. Write chapters (if provided)
+  // 5. Write chapters (if provided)
   let chaptersWritten = 0;
   if (args.chapters) {
     for (const ch of args.chapters) {
@@ -346,13 +363,13 @@ export async function librarianAddBook(deps, args) {
     }
   }
 
-  // 7. Clear caches
+  // 6. LIBRARIAN-050: clear caches after successful mutation
   deps.clearCaches();
 
   return {
     slug: args.slug,
     title: args.title,
-    directory: `_corpus/${args.slug}-book`,
+    directory: `_corpus/${args.slug}`,
     chaptersWritten,
     indexed: false,
     hint: "Run rebuild_index to make this book searchable.",
@@ -374,17 +391,17 @@ npx vitest run tests/corpus/librarian-tools.test.ts
 
 ### Implementation
 
-1. Find the book directory by scanning `_corpus/` for a `book.json` with
-   matching slug
-2. Validate `chapter_slug` format
-3. Write `_corpus/{book-dir}/chapters/{chapter_slug}.md`
-4. Clear caches
+1. Find the book directory: `_corpus/{book_slug}/` (dir = slug)
+2. Validate `chapter_slug` format (`LIBRARIAN-080`)
+3. Write `_corpus/{book_slug}/chapters/{chapter_slug}.md`
+4. Clear caches (`LIBRARIAN-050`)
 5. Return confirmation
 
 ### Edge cases
 
 - Book doesn't exist → throw error
-- Chapter already exists → overwrite (idempotent — this enables re-generation)
+- Chapter already exists → **overwrite** (idempotent — enables re-generation,
+  per §3.5 acceptance rules)
 - Empty content → throw error
 
 ### Verify
@@ -401,24 +418,24 @@ npx vitest run tests/corpus/librarian-tools.test.ts
 
 ### `librarianRemoveBook` implementation
 
-1. Find book directory by slug
+1. Find book directory: `_corpus/{slug}/` (dir = slug)
 2. List all chapters to get source IDs (`{slug}/{chapterSlug}`)
-3. For each chapter, call `vectorStore.delete(sourceId)`
+3. For each chapter, call `vectorStore.delete(sourceId)` (`LIBRARIAN-060`)
 4. Remove the entire book directory recursively (`fs.rm(dir, { recursive: true })`)
-5. Clear caches
+5. Clear caches (`LIBRARIAN-050`)
 6. Return counts
 
 ### `librarianRemoveChapter` implementation
 
 1. Find book directory and chapter file
-2. Call `vectorStore.delete("{bookSlug}/{chapterSlug}")`
+2. Call `vectorStore.delete("{bookSlug}/{chapterSlug}")` (`LIBRARIAN-060`)
 3. Remove the `.md` file
-4. Clear caches
+4. Clear caches (`LIBRARIAN-050`)
 5. Return confirmation
 
 ### Safety
 
-- `assertSafePath()` validates all paths before deletion
+- `assertSafePath()` validates all paths before deletion (`LIBRARIAN-070`)
 - Only deletes within `_corpus/` — never escapes
 
 ### Verify
@@ -429,93 +446,9 @@ npx vitest run tests/corpus/librarian-tools.test.ts
 
 ---
 
-## Task 1.7 — Implement `librarian_add_book` (zip mode)
+## Task 1.7 — Path traversal prevention and slug validation tests
 
-**What:** Accept a base64-encoded zip archive containing `book.json` and
-`chapters/*.md`, validate it, and extract to `_corpus/`.
-
-### Implementation
-
-```typescript
-async function addBookFromZip(
-  deps: LibrarianToolDeps,
-  zipBase64: string,
-): Promise<{ slug: string; title: string; directory: string; chaptersWritten: number; indexed: boolean; hint: string }> {
-  // 1. Decode base64 to Buffer
-  const zipBuffer = Buffer.from(zipBase64, "base64");
-
-  // 2. Size check (50 MB max uncompressed)
-  // Use Node.js built-in zlib or a zip library
-
-  // 3. Extract and validate structure
-  //    - Must contain book.json at root
-  //    - Must contain chapters/ directory with *.md files
-  //    - No path traversal (no "..", no absolute paths)
-  //    - No symlinks
-
-  // 4. Parse book.json, validate fields
-  // 5. Check slug uniqueness
-  // 6. Write to _corpus/{slug}-book/
-  // 7. Clear caches
-  // 8. Return result
-}
-```
-
-### Zip library
-
-Use Node.js built-in `zlib` for decompression, or the lightweight `adm-zip`
-package if zip file handling is needed. Since the project already has `tsx` and
-no strict dependency policy against small utilities, `adm-zip` is acceptable.
-Alternatively, implement manual zip parsing with the built-in `Uint8Array` APIs.
-
-**Decision for implementation:** Use `adm-zip` (install as dev dependency) for
-reliable zip handling. It's a pure-JS implementation with no native bindings.
-
-```bash
-npm install adm-zip
-npm install -D @types/adm-zip
-```
-
-### Zip validation (spec §8.3)
-
-```typescript
-function validateZipSafety(entries: AdmZip.IZipEntry[]): void {
-  let totalSize = 0;
-  for (const entry of entries) {
-    // Path traversal check
-    if (entry.entryName.includes("..")) throw new Error("Path traversal in zip");
-    if (path.isAbsolute(entry.entryName)) throw new Error("Absolute path in zip");
-
-    // Size check
-    totalSize += entry.header.size;
-    if (totalSize > 50 * 1024 * 1024) throw new Error("Zip exceeds 50 MB limit");
-
-    // Symlink check
-    if (entry.isDirectory && entry.header.attr === 0xA1ED) {
-      throw new Error("Symlinks not allowed in zip");
-    }
-  }
-
-  // Zip bomb detection
-  const compressedSize = entries.reduce((s, e) => s + e.header.compressedSize, 0);
-  if (compressedSize > 0 && totalSize / compressedSize > 100) {
-    throw new Error("Suspicious compression ratio — possible zip bomb");
-  }
-}
-```
-
-### Verify
-
-```bash
-npx tsc --noEmit
-npx vitest run tests/corpus/librarian-tools.test.ts
-```
-
----
-
-## Task 1.8 — Path traversal and zip safety tests
-
-**What:** Dedicated security tests for filesystem and zip operations.
+**What:** Dedicated security tests for filesystem operations.
 
 | Test | Description |
 |------|-------------|
@@ -523,12 +456,9 @@ npx vitest run tests/corpus/librarian-tools.test.ts
 | rejects slug with dots | `slug: "my.book"` → error |
 | rejects absolute path in slug | `slug: "/tmp/evil"` → error |
 | rejects chapter slug with traversal | `chapter_slug: "../../passwd"` → error |
-| rejects zip with path traversal entry | Zip containing `../../../etc/passwd` → error |
-| rejects zip exceeding size limit | Zip with > 50 MB uncompressed → error |
-| rejects zip missing book.json | Zip with only chapters/ → error |
-| rejects zip with suspicious compression ratio | Zip bomb → error |
+| rejects single-char slug | `slug: "a"` → error (doesn't match kebab pattern) |
 
-**~8 security tests.**
+**~5 security tests.** `[LIBRARIAN-070, LIBRARIAN-080]`
 
 ### Verify
 
@@ -538,7 +468,7 @@ npx vitest run tests/corpus/librarian-security.test.ts
 
 ---
 
-## Task 1.9 — Full unit test suite for librarian tools
+## Task 1.8 — Full unit test suite for librarian tools
 
 **What:** Complete test coverage for all 6 tool functions.
 
@@ -553,13 +483,13 @@ an `InMemoryVectorStore` — no real DB.
 | lists books with chapter counts | `librarian_list` | 2 books → correct counts and indexing status |
 | gets book details with chapters | `librarian_get_book` | Returns chapters with titles and contentLength |
 | throws for missing book | `librarian_get_book` | Unknown slug → error |
-| adds book with chapters (manual) | `librarian_add_book` | Creates dir, book.json, chapter files |
+| adds book with chapters (manual) | `librarian_add_book` | Creates dir (= slug), book.json (with sortOrder), chapter files |
 | adds book without chapters (manual) | `librarian_add_book` | Creates dir + book.json only |
 | rejects duplicate slug | `librarian_add_book` | Existing slug → error |
 | rejects missing fields | `librarian_add_book` | No title → error |
-| adds book from zip | `librarian_add_book` | Valid zip → extracted correctly |
-| rejects invalid zip | `librarian_add_book` | Zip missing book.json → error |
+| validates sortOrder is number | `librarian_add_book` | String sortOrder → error |
 | adds chapter to existing book | `librarian_add_chapter` | File written, cache cleared |
+| overwrites existing chapter | `librarian_add_chapter` | Existing chapter → overwritten (idempotent) |
 | rejects chapter for missing book | `librarian_add_chapter` | Unknown book → error |
 | rejects empty content | `librarian_add_chapter` | Empty string → error |
 | removes book and embeddings | `librarian_remove_book` | Dir deleted, embeddings deleted, cache cleared |
@@ -569,26 +499,26 @@ an `InMemoryVectorStore` — no real DB.
 | clears caches after add | cache | `clearCaches` called after `librarian_add_book` |
 | clears caches after remove | cache | `clearCaches` called after `librarian_remove_book` |
 
-**~19 functional tests + ~8 security tests from Task 1.8 = ~27 total.**
+**~19 functional tests + ~5 security tests from Task 1.7 = ~24 total.**
 
 ### Verify
 
 ```bash
 npx vitest run tests/corpus/
-npm test                        # full suite: ~317 + ~27 = ~344 tests
+npm test                        # full suite: ~319 + ~24 = ~343 tests
 npm run build                   # clean
 ```
 
 ---
 
-## Task 1.10 — Full verification
+## Task 1.9 — Full verification
 
 **What:** Run the complete validation suite.
 
 ```bash
 npx tsc --noEmit              # type-check
 npm run lint                  # lint clean
-npm test                      # all ~344 tests pass
+npm test                      # all ~343 tests pass
 npm run build                 # build discovers corpus, embeds, BM25 indexes
 ```
 
@@ -597,9 +527,9 @@ npm run build                 # build discovers corpus, embeds, BM25 indexes
 | Suite | Tests |
 |-------|-------|
 | Existing (Sprints 0–5 vector search) | 307 |
-| Sprint 0 (discovery + cache) | ~10 |
-| Sprint 1 (librarian tools) | ~27 |
-| **Total** | **~344** |
+| Sprint 0 (discovery + cache) | ~12 |
+| Sprint 1 (librarian tools) | ~24 |
+| **Total** | **~343** |
 
 ---
 
@@ -609,16 +539,15 @@ npm run build                 # build discovers corpus, embeds, BM25 indexes
 - [ ] `mcp/embedding-server.ts` — 12 total tools (6 embedding + 6 librarian)
 - [ ] `librarian_list` — returns book inventory with indexing status
 - [ ] `librarian_get_book` — returns book details with chapter listing
-- [ ] `librarian_add_book` (manual) — creates book dir + book.json + chapters
-- [ ] `librarian_add_book` (zip) — validates and extracts zip archive
-- [ ] `librarian_add_chapter` — adds chapter to existing book
+- [ ] `librarian_add_book` (manual) — creates `_corpus/{slug}/` + book.json (with sortOrder) + chapters
+- [ ] `librarian_add_chapter` — adds/overwrites chapter to existing book
 - [ ] `librarian_remove_book` — removes book dir + cleans embeddings
 - [ ] `librarian_remove_chapter` — removes chapter file + cleans embeddings
-- [ ] Path traversal prevention on all filesystem operations
-- [ ] Zip safety: size limit, no traversal, no symlinks, bomb detection
-- [ ] Cache clearing after every mutation
-- [ ] ~27 unit tests for librarian tools
-- [ ] All ~344 tests pass
+- [ ] Path traversal prevention via `path.relative()` on all filesystem ops
+- [ ] Slug validation: lowercase kebab-case, max 100 chars
+- [ ] Cache clearing after every successful mutation (`LIBRARIAN-050`)
+- [ ] ~24 unit tests for librarian tools
+- [ ] All ~343 tests pass
 - [ ] `npm run build` clean
 
 ---

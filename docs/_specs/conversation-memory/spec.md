@@ -10,6 +10,8 @@
 >   conversion tracking. Database-backed system prompt management with
 >   versioning and per-role control via MCP tools. Admin conversation
 >   analytics for engagement analysis and conversion optimization.
+>   Kernel generalization to decouple domain-specific naming and
+>   configuration from the reusable application core.
 > **Dependencies:** RBAC (complete), Vector Search (complete), Tool
 >   Architecture (complete), Conversation persistence (complete),
 >   MCP Embedding Server (complete)
@@ -124,6 +126,19 @@
    abandoned. There is no mechanism to migrate `anon_{uuid}` conversations
    to the new user ID. The user loses their history, and the admin loses
    the ability to trace the conversion path. `[CONVO-080]`
+
+9. **Domain-specific naming saturates the core layer** — the architecture
+   follows Clean Architecture correctly (`src/core/` never imports from
+   `src/lib/` or `src/app/`), but entity names, repository interfaces,
+   and search types are coupled to the current book-library domain:
+   `BookChunkMetadata`, `BookRepository`, `BookQuery`, `ChapterQuery`,
+   `Book`, `Chapter`, `Checklist`, `Practitioner` all live in
+   `src/core/`. The `HybridSearchEngine` defaults to `"book_chunk"`
+   source type. Tool descriptions hardcode "10 books (104 chapters)".
+   The `BASE_PROMPT` embeds corpus-specific context. This means
+   re-deploying the system for a different domain (legal, healthcare,
+   education) requires renaming ~40% of the core layer rather than just
+   swapping configuration and content. `[CONVO-090]`
 
 ### 1.2 Core Insight
 
@@ -601,6 +616,14 @@ filtering by both fields.
     prompt_version_changed) are recorded in a `conversation_events`
     table, providing the foundation for all analytics. `[CONVO-070]`
 
+11. **Kernel generalization** — the domain layer (`src/core/`) uses
+    generic, content-agnostic names. Entities, repository ports, search
+    types, and tool descriptors reference "documents" and "corpus" —
+    not books, chapters, or any specific domain. Configuration (source
+    types, corpus metadata, tool descriptions) is externalized so the
+    system can be re-deployed for a different domain by swapping content
+    and config, not code. `[CONVO-090]`
+
 ---
 
 ## 4. Architecture Overview
@@ -671,6 +694,10 @@ filtering by both fields.
 | Conversion tracking | `converted_from` column on conversations + migration on register | Traces the full anonymous→authenticated funnel; preserves conversation continuity |
 | Analytics delivery | MCP tools (not dashboard UI) | Consistent with librarian/embedding admin pattern; no frontend needed |
 | Conversation metadata | Denormalized `message_count`, `first_message_at`, `last_tool_used` | Avoids expensive JOINs for analytics queries; updated on each message append |
+| Core entity naming | `Document`/`Corpus` over `Book`/`Chapter` | Domain-agnostic core enables re-deployment for any knowledge domain |
+| Source type registry | Externalized `source_type` config, no hardcoded `"book_chunk"` | New domains register their source type without touching search infrastructure |
+| Tool description generation | Auto-generated from registry + corpus metadata | Tool descriptions stay accurate as corpus changes; no manual prompt editing |
+| Corpus metadata | Externalized to config file or DB, not hardcoded in tool factories | Corpus size, structure, and description become deployment config |
 
 ---
 
@@ -1836,11 +1863,110 @@ optimization of the anonymous→authenticated conversion path.
 **Deliverable: ~417 existing + ~7 new = ~424 tests, full analytics
 dashboard via MCP tools.**
 
+### Sprint 5 — Kernel Generalization
+
+**Goal:** Decouple all domain-specific naming, configuration, and content
+references from the reusable application core. After this sprint, spinning
+up the system for a new domain (legal, healthcare, education) requires
+only: (1) new corpus content, (2) prompt changes via MCP tools, (3)
+optional domain-specific MCP tool servers. Zero changes to `src/core/`.
+
+#### 5.1 Core Entity Renaming
+
+| Current | New | Files Affected |
+|---------|-----|----------------|
+| `Book` | `Document` | `src/core/entities/library.ts` → `src/core/entities/corpus.ts` |
+| `Chapter` | `Section` | `src/core/entities/library.ts` → `src/core/entities/corpus.ts` |
+| `Checklist` | _(remove or generalize to `Supplement`)_ | `src/core/entities/library.ts` |
+| `Practitioner` | _(remove or generalize to `Contributor`)_ | `src/core/entities/library.ts` |
+| `BookChunkMetadata` | `DocumentChunkMetadata` | `src/core/search/ports/Chunker.ts` |
+| `BookRepository` | `CorpusRepository` | `src/core/use-cases/BookRepository.ts` → `CorpusRepository.ts` |
+| `BookQuery` | `CorpusQuery` | same file |
+| `ChapterQuery` | `SectionQuery` | same file |
+| `BookSummaryInteractor` | `CorpusSummaryInteractor` | `src/core/use-cases/BookSummaryInteractor.ts` |
+| `LibrarySearchResult` | `CorpusSearchResult` | `src/core/entities/library.ts` |
+
+All adapters (`src/adapters/`, `src/lib/`) update their imports to match.
+Tests update accordingly. No behavioral changes — pure rename refactor.
+
+#### 5.2 Search Infrastructure Generalization
+
+| Change | Details |
+|--------|---------|
+| Remove `"book_chunk"` default in `HybridSearchEngine` | Require explicit `sourceType` on every `VectorQuery`; no fallback |
+| Create `SourceTypeRegistry` | A simple config object mapping source types to display names and metadata schemas: `{ "document_chunk": { label: "Document", metadataShape: ... } }` |
+| Generalize `HybridSearchResult` metadata | Replace `bookTitle`, `bookNumber`, `bookSlug` with generic `documentTitle`, `documentId`, `documentSlug` |
+| Update `MarkdownChunker` | Remove hardcoded `sourceType === "book_chunk"` check; use registry |
+| Update `SearchHandlerChain` | Remove hardcoded `"book_chunk"` index lookups; use configured source type |
+
+#### 5.3 Tool Description Externalization
+
+| Change | Details |
+|--------|---------|
+| Create `corpus-config.ts` or `corpus-config.json` | Externalize: corpus name, document count, section count, corpus description, source type string |
+| Auto-generate tool descriptions | `search-books.tool.ts` → `search-corpus.tool.ts`; description reads from config: `"Search across all ${config.documentCount} documents (${config.sectionCount} sections)"` |
+| Auto-generate `get-book-summary.tool.ts` | → `get-corpus-summary.tool.ts`; summary comes from config, not hardcoded |
+| Rename tool identifiers | `search_books` → `search_corpus`, `get_book_summary` → `get_corpus_summary`, `get_chapter` → `get_section` |
+| Update `BASE_PROMPT` seed | Sprint 3's seed migration already has the prompt in the DB; update the fallback constant to use config-derived text |
+
+#### 5.4 Adapter + Route Renaming
+
+| Current | New |
+|---------|-----|
+| `src/adapters/FileSystemBookRepository.ts` | `FileSystemCorpusRepository.ts` |
+| `src/lib/book-library.ts` | `src/lib/corpus-library.ts` |
+| `src/lib/book-actions.ts` | `src/lib/corpus-actions.ts` |
+| `src/app/books/page.tsx` | `src/app/corpus/page.tsx` (or keep `books/` as a domain-specific route redirecting to generic) |
+| `mcp/embedding-tool.ts` references to `BookChunkMetadata` | Use `DocumentChunkMetadata` |
+
+#### 5.5 MCP Librarian Tool Generalization
+
+| Current Tool | New Tool | Change |
+|-------------|----------|--------|
+| `librarian_list` | `corpus_list` | Returns documents instead of books |
+| `librarian_get` | `corpus_get` | Returns document details instead of book details |
+| `librarian_add_book` | `corpus_add_document` | Ingests a document, not specifically a book |
+| `librarian_remove_book` | `corpus_remove_document` | Removes a document |
+| `librarian_update_book` | `corpus_update_document` | Updates a document |
+| `librarian_search` | `corpus_search` | Searches the corpus |
+
+The MCP server file `mcp/embedding-server.ts` registers tools using the
+new generic names. Tool handler logic is unchanged — only names and
+descriptions change.
+
+#### 5.6 Sprint Tasks
+
+| Task | Description | Req |
+|------|-------------|-----|
+| 5.1 | Create `src/core/entities/corpus.ts` with generic entity interfaces (`Document`, `Section`, `Supplement`, `Contributor`) | CONVO-090 |
+| 5.2 | Rename `BookRepository` port → `CorpusRepository` with `CorpusQuery` / `SectionQuery` | CONVO-090 |
+| 5.3 | Rename `BookSummaryInteractor` → `CorpusSummaryInteractor` | CONVO-090 |
+| 5.4 | Rename `BookChunkMetadata` → `DocumentChunkMetadata` in `src/core/search/` | CONVO-090 |
+| 5.5 | Remove `"book_chunk"` default in `HybridSearchEngine`; require explicit source type | CONVO-090 |
+| 5.6 | Generalize `HybridSearchResult` metadata fields (`bookTitle` → `documentTitle`, etc.) | CONVO-090 |
+| 5.7 | Update `MarkdownChunker` and `SearchHandlerChain` to use generic source type | CONVO-090 |
+| 5.8 | Create `corpus-config.ts` with externalized corpus metadata (name, counts, description, source type) | CONVO-090 |
+| 5.9 | Rename tool files and identifiers: `search_books` → `search_corpus`, `get_book_summary` → `get_corpus_summary`, `get_chapter` → `get_section` | CONVO-090 |
+| 5.10 | Auto-generate tool descriptions from corpus config | CONVO-090 |
+| 5.11 | Rename adapter: `FileSystemBookRepository` → `FileSystemCorpusRepository` | CONVO-090 |
+| 5.12 | Rename `src/lib/book-library.ts` → `corpus-library.ts`, `book-actions.ts` → `corpus-actions.ts` | CONVO-090 |
+| 5.13 | Rename MCP librarian tools: `librarian_*` → `corpus_*` | CONVO-090 |
+| 5.14 | Update `mcp/embedding-tool.ts` to use `DocumentChunkMetadata` and generic source type | CONVO-090 |
+| 5.15 | Update `BASE_PROMPT` fallback constant to use corpus config instead of hardcoded book references | CONVO-090 |
+| 5.16 | Update all route files: `src/app/books/` → `src/app/corpus/` (with redirect from old path) | CONVO-090 |
+| 5.17 | Update all tests to use new names (pure rename — no logic changes) | CONVO-090 |
+| 5.18 | Full suite green, build clean | |
+
+**Deliverable: ~424 existing tests (renamed, not new) + build clean.
+The `src/core/` layer is fully domain-agnostic. Re-deploying for a new
+domain requires only: new corpus files, prompt edits via MCP, and
+optionally new domain-specific MCP tool servers.**
+
 ---
 
 ## 17. Future Considerations
 
-These items are explicitly out of scope for Sprints 0–4.
+These items are explicitly out of scope for Sprints 0–5.
 
 ### 17.1 Multi-Conversation (Phase 2)
 
@@ -1852,10 +1978,11 @@ conversations. If demand emerges:
 
 ### 17.2 Cross-Source Search
 
-A "search everything" tool could query both `book_chunk` and
+A "search everything" tool could query both `document_chunk` and
 `conversation` source types in a single `HybridSearchEngine.search()`
-call. Requires generalizing `HybridSearchResult` into a discriminated
-union. The `VectorQuery.sourceType` filter already supports this pattern.
+call. After Sprint 5, `HybridSearchResult` uses generic metadata fields,
+so a discriminated union by `sourceType` is straightforward. The
+`VectorQuery.sourceType` filter already supports this pattern.
 
 ### 17.3 Proactive Recall
 

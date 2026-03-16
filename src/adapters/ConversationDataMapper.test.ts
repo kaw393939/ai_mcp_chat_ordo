@@ -4,6 +4,14 @@ import { ensureSchema } from "../lib/db/schema";
 import { ConversationDataMapper } from "./ConversationDataMapper";
 import { MessageDataMapper } from "./MessageDataMapper";
 
+function requireValue<T>(value: T | null | undefined): T {
+  expect(value).toBeTruthy();
+  if (value == null) {
+    throw new Error("Expected value to be present.");
+  }
+  return value;
+}
+
 function createDb() {
   const db = new Database(":memory:");
   // Enable foreign keys (needed for CASCADE)
@@ -37,19 +45,20 @@ describe("ConversationDataMapper", () => {
     expect(conv.userId).toBe("usr_test");
     expect(conv.title).toBe("Hello");
 
-    const found = await mapper.findById("conv_1");
-    expect(found).not.toBeNull();
-    expect(found!.title).toBe("Hello");
+    const found = requireValue(await mapper.findById("conv_1"));
+    expect(found.title).toBe("Hello");
   });
 
   it("listByUser returns summaries with messageCount ordered by updated_at desc", async () => {
     await mapper.create({ id: "conv_a", userId: "usr_test", title: "First" });
     await mapper.create({ id: "conv_b", userId: "usr_test", title: "Second" });
 
-    // Add messages to conv_a
+    // Add messages to conv_a and increment denormalized count
     const msgMapper = new MessageDataMapper(db);
     await msgMapper.create({ conversationId: "conv_a", role: "user", content: "hi", parts: [] });
+    await mapper.incrementMessageCount("conv_a");
     await msgMapper.create({ conversationId: "conv_a", role: "assistant", content: "hello", parts: [] });
+    await mapper.incrementMessageCount("conv_a");
 
     // Manually set updated_at so ordering is deterministic (datetime('now') may be same second)
     db.prepare(`UPDATE conversations SET updated_at = '2099-01-01 00:00:00' WHERE id = 'conv_a'`).run();
@@ -83,13 +92,49 @@ describe("ConversationDataMapper", () => {
   it("updateTitle changes title", async () => {
     await mapper.create({ id: "conv_t", userId: "usr_test", title: "" });
     await mapper.updateTitle("conv_t", "New Title");
-    const found = await mapper.findById("conv_t");
-    expect(found!.title).toBe("New Title");
+    const found = requireValue(await mapper.findById("conv_t"));
+    expect(found.title).toBe("New Title");
   });
 
   it("findById returns null for nonexistent", async () => {
     const found = await mapper.findById("nonexistent");
     expect(found).toBeNull();
+  });
+
+  it("findActiveByUser returns the active conversation", async () => {
+    await mapper.create({ id: "conv_active", userId: "usr_test", title: "Active" });
+    await mapper.create({ id: "conv_archived", userId: "usr_test", title: "Archived", status: "archived" });
+
+    const active = requireValue(await mapper.findActiveByUser("usr_test"));
+    expect(active.id).toBe("conv_active");
+    expect(active.status).toBe("active");
+  });
+
+  it("findActiveByUser returns null when no active conversation", async () => {
+    await mapper.create({ id: "conv_arch", userId: "usr_test", title: "Archived", status: "archived" });
+    const active = await mapper.findActiveByUser("usr_test");
+    expect(active).toBeNull();
+  });
+
+  it("archiveByUser sets active conversations to archived", async () => {
+    await mapper.create({ id: "conv_1", userId: "usr_test", title: "Active" });
+    await mapper.archiveByUser("usr_test");
+
+    const found = requireValue(await mapper.findById("conv_1"));
+    expect(found.status).toBe("archived");
+  });
+
+  it("transferOwnership moves conversations and returns affected IDs", async () => {
+    // Seed a second "anonymous" user so FK doesn't complain
+    await mapper.create({ id: "conv_anon", userId: "usr_test", title: "Anon Chat" });
+    // Transfer from usr_test to usr_test (same user for simplicity — logic is the same)
+    db.prepare(`INSERT OR IGNORE INTO users (id, email, name) VALUES ('usr_new', 'new@test.com', 'New')`).run();
+    const ids = await mapper.transferOwnership("usr_test", "usr_new");
+    expect(ids).toEqual(["conv_anon"]);
+
+    const found = requireValue(await mapper.findById("conv_anon"));
+    expect(found.userId).toBe("usr_new");
+    expect(found.convertedFrom).toBe("usr_test");
   });
 });
 

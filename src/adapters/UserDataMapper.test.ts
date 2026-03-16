@@ -3,6 +3,14 @@ import { UserDataMapper } from "./UserDataMapper";
 import Database from "better-sqlite3";
 import { ensureSchema } from "../lib/db/schema";
 
+function requireValue<T>(value: T | null | undefined): T {
+  expect(value).toBeTruthy();
+  if (value == null) {
+    throw new Error("Expected value to be present.");
+  }
+  return value;
+}
+
 describe("UserDataMapper", () => {
   it("should retrieve a user by active role", () => {
     const db = new Database(":memory:");
@@ -45,14 +53,12 @@ describe("UserDataMapper", () => {
     expect(user.name).toBe("Test User");
     expect(user.roles).toEqual(["AUTHENTICATED"]);
 
-    const byEmail = await mapper.findByEmail("test@example.com");
-    expect(byEmail).not.toBeNull();
-    expect(byEmail!.id).toBe(user.id);
-    expect(byEmail!.passwordHash).toBe("$2a$12$testhash");
+    const byEmail = requireValue(await mapper.findByEmail("test@example.com"));
+    expect(byEmail.id).toBe(user.id);
+    expect(byEmail.passwordHash).toBe("$2a$12$testhash");
 
-    const byId = await mapper.findById(user.id);
-    expect(byId).not.toBeNull();
-    expect(byId!.email).toBe("test@example.com");
+    const byId = requireValue(await mapper.findById(user.id));
+    expect(byId.email).toBe("test@example.com");
     // Public User type should NOT include passwordHash
     expect(byId).not.toHaveProperty("passwordHash");
 

@@ -30,13 +30,11 @@ export default function MentionsMenu({
 
   return (
     <div
-      className="absolute z-[100] w-72 bg-[var(--surface)] border-theme rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-bottom-2 duration-200"
-      style={{
-        bottom: "calc(100% + 8px)",
-        left: "12px",
-      }}
+      className="absolute inset-x-0 bottom-[calc(100%+0.75rem)] z-[100] mx-auto w-full max-w-[min(28rem,calc(100vw-2rem))] overflow-hidden rounded-[24px] border-theme bg-surface shadow-2xl animate-in fade-in slide-in-from-bottom-2 duration-200"
+      role="listbox"
+      aria-label="Mention suggestions"
     >
-      <div className="px-3 py-2 border-b border-[var(--border-color)] bg-[var(--surface-muted)] flex items-center justify-between">
+      <div className="px-3 py-2 border-b border-border bg-surface-muted flex items-center justify-between">
         <span className="text-label opacity-50">
           Suggestions
         </span>
@@ -51,11 +49,13 @@ export default function MentionsMenu({
             <button
               key={item.id}
               onClick={() => onSelect(item)}
-              className={`flex items-start gap-3 w-full px-3 py-3 rounded-lg text-left transition-all ${
+              className={`focus-ring flex min-h-12 w-full items-start gap-3 rounded-lg px-3 py-3 text-left transition-all ${
                 index === activeIndex
-                  ? "accent-fill shadow-lg shadow-[var(--accent-color)]/20"
+                  ? "accent-fill shadow-lg shadow-accent/20"
                   : "hover-surface"
               }`}
+              role="option"
+              aria-selected={index === activeIndex}
             >
               <span className="text-base mt-0.5 shrink-0">
                 {strategy?.getIcon() || "❓"}

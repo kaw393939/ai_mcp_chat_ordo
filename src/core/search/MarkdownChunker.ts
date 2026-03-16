@@ -3,7 +3,6 @@ import type {
   ChunkMetadata,
   Chunker,
   ChunkerOptions,
-  BookChunkMetadata,
 } from "./ports/Chunker";
 
 const DEFAULT_OPTIONS: ChunkerOptions = {

@@ -24,11 +24,11 @@ export function ThemeSwitcher() {
             key={t.id}
             onClick={() => setTheme(t.id)}
             className={`
-              rounded-md px-3 py-1.5 text-xs font-medium transition-all
+              rounded-md px-3 py-1.5 text-xs font-medium transition-all focus-ring
               ${
                 theme === t.id
                   ? "accent-fill shadow-sm"
-                  : "bg-[var(--surface-muted)] text-[var(--foreground)] opacity-70 hover:opacity-100 hover-surface"
+                  : "bg-surface-muted text-foreground opacity-70 hover:opacity-100 hover-surface"
               }
             `}
           >

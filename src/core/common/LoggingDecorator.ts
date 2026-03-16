@@ -1,4 +1,4 @@
-import { UseCase } from "./UseCase";
+import type { UseCase } from "./UseCase";
 
 /**
  * Decorator: Logging

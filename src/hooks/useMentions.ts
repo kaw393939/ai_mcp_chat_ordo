@@ -1,12 +1,13 @@
 "use client";
 
 import { useState, useCallback, type RefObject } from "react";
+import type {
+  MentionCategory} from "../core/entities/mentions";
 import {
   PRACTITIONERS,
   CHAPTERS,
   FRAMEWORKS,
-  type MentionItem,
-  MentionCategory,
+  type MentionItem
 } from "../core/entities/mentions";
 import { commandRegistry } from "../core/commands/CommandRegistry";
 

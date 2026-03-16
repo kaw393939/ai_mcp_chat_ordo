@@ -1,3 +1,5 @@
+import type { ChunkMetadata } from "./ports/Chunker";
+
 export interface HybridSearchResult {
   bookTitle: string;
   bookNumber: string;
@@ -12,6 +14,17 @@ export interface HybridSearchResult {
   matchSection: string | null;
   matchHighlight: string;
   passageOffset: { start: number; end: number };
+}
+
+export interface ConversationSearchResult {
+  conversationId: string;
+  conversationTitle: string;
+  conversationDate: string;
+  matchPassage: string;
+  matchHighlight: string;
+  turnIndex: number;
+  rrfScore: number;
+  relevance: "high" | "medium" | "low";
 }
 
 /** Result of indexing a single document */
@@ -35,7 +48,7 @@ export interface DocumentInput {
   sourceId: string;
   content: string;
   contentHash: string;
-  metadata: import("./ports/Chunker").ChunkMetadata;
+  metadata: ChunkMetadata;
 }
 
 // Re-export all port types for convenient single-point imports
@@ -59,3 +72,4 @@ export type {
 } from "./ports/BM25IndexStore";
 export type { SearchHandler } from "./ports/SearchHandler";
 export type { QueryProcessingStep } from "./ports/QueryProcessingStep";
+export { ConversationChunker } from "./ConversationChunker";

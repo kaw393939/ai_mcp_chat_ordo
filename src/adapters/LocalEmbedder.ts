@@ -1,7 +1,7 @@
 import type { Embedder } from "@/core/search/ports/Embedder";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-type Pipeline = (text: string, options?: Record<string, unknown>) => Promise<any>;
+type PipelineOutput = { data: ArrayLike<number> };
+type Pipeline = (text: string, options?: Record<string, unknown>) => Promise<PipelineOutput>;
 
 export class LocalEmbedder implements Embedder {
   private pipe: Pipeline | null = null;
@@ -33,6 +33,11 @@ export class LocalEmbedder implements Embedder {
         "Xenova/all-MiniLM-L6-v2",
       );
     }
-    return this.pipe!;
+
+    if (!this.pipe) {
+      throw new Error("Embedding pipeline failed to initialize.");
+    }
+
+    return this.pipe;
   }
 }

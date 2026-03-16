@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { CachedBookRepository } from "@/adapters/CachedBookRepository";
 import type { BookRepository } from "@/core/use-cases/BookRepository";
 import type { Book } from "@/core/entities/library";
@@ -20,9 +20,9 @@ function createMockRepo(): BookRepository & { callCounts: Record<string, number>
     callCounts,
     async getAllBooks() { callCounts.getAllBooks++; return [book]; },
     async getBook(slug: string) { callCounts.getBook++; return slug === "book-1" ? book : null; },
-    async getChaptersByBook(_bookSlug: string) { callCounts.getChaptersByBook++; return [chapter]; },
+    async getChaptersByBook() { callCounts.getChaptersByBook++; return [chapter]; },
     async getAllChapters() { callCounts.getAllChapters++; return [chapter]; },
-    async getChapter(_bookSlug: string, _chapterSlug: string) { callCounts.getChapter++; return chapter; },
+    async getChapter() { callCounts.getChapter++; return chapter; },
   };
 }
 

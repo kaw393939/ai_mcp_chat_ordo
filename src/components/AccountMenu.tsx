@@ -3,7 +3,8 @@
 import React, { useState, useEffect, useRef } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useTheme, AccessibilitySettings, FontSize, SpacingLevel } from "./ThemeProvider";
+import { useTheme } from "./ThemeProvider";
+import type { AccessibilitySettings, FontSize, SpacingLevel } from "./ThemeProvider";
 import { useMockAuth } from "@/hooks/useMockAuth";
 import type { User as SessionUser, RoleName } from "@/core/entities/user";
 
@@ -22,7 +23,7 @@ const ROLE_CONFIG: Record<
   },
   AUTHENTICATED: {
     label: "Authenticated",
-    dot: "bg-[var(--status-success)]",
+    dot: "bg-status-success",
     description: "Signed-in user — full library access",
   },
   STAFF: {
@@ -42,7 +43,7 @@ const SettingBlock = ({ label, children }: { label: string; children: React.Reac
     <div className="text-[9px] font-bold uppercase tracking-widest opacity-60 ml-1">
       {label}
     </div>
-    <div className="flex p-1 bg-[var(--surface-muted)] rounded-xl gap-1 border-theme">
+    <div className="flex p-1 bg-surface-muted rounded-theme gap-1 border-theme">
       {children}
     </div>
   </div>
@@ -51,9 +52,9 @@ const SettingBlock = ({ label, children }: { label: string; children: React.Reac
 const ControlButton = ({ active, onClick, label }: { active: boolean; onClick: () => void; label: string }) => (
   <button
     onClick={onClick}
-    className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all ${
+    className={`flex-1 py-1.5 text-[10px] font-bold rounded-lg transition-all focus-ring ${
       active
-        ? "bg-[var(--surface)] text-[var(--accent-color)] shadow-sm scale-[1.02]"
+        ? "bg-surface text-accent shadow-sm scale-[1.02]"
         : "opacity-40 hover:opacity-100"
     }`}
   >
@@ -79,15 +80,15 @@ export function AccountMenu({ user }: AccountMenuProps) {
 
   useEffect(() => {
     if (!open) return;
-    const onClickOutside = (e: MouseEvent) => {
+    const onClickOutside = (e: PointerEvent) => {
       if (ref.current && !ref.current.contains(e.target as Node)) {
         setOpen(false);
         setShowAccessibility(false);
         setShowSimulation(false);
       }
     };
-    document.addEventListener("mousedown", onClickOutside);
-    return () => document.removeEventListener("mousedown", onClickOutside);
+    document.addEventListener("pointerdown", onClickOutside);
+    return () => document.removeEventListener("pointerdown", onClickOutside);
   }, [open]);
 
   const initials = user.name
@@ -133,7 +134,7 @@ export function AccountMenu({ user }: AccountMenuProps) {
         </Link>
         <Link
           href="/register"
-          className="px-4 py-1.5 rounded-full text-[11px] font-bold bg-[var(--foreground)] text-[var(--background)] hover:opacity-90 transition-opacity"
+          className="px-4 py-1.5 rounded-full text-[11px] font-bold bg-foreground text-background hover:opacity-90 transition-opacity"
         >
           Register
         </Link>
@@ -144,15 +145,15 @@ export function AccountMenu({ user }: AccountMenuProps) {
   const menuTrigger = (
     <button
       onClick={() => setOpen(!open)}
-      className="flex items-center gap-2 group p-1 rounded-full hover-surface transition-all"
+      className="flex items-center gap-2 group p-1 rounded-full hover-surface transition-all focus-ring"
     >
-      <div className="flex flex-col items-end mr-1 hidden md:flex">
+      <div className="mr-1 hidden flex-col items-end md:flex">
         <span className="text-[11px] font-bold leading-none">{user.name}</span>
         <span className="text-[9px] opacity-60 uppercase tracking-tighter">
           {user.roles[0]}
         </span>
       </div>
-      <div className="w-8 h-8 rounded-full border-theme bg-[var(--surface-muted)] flex items-center justify-center text-[10px] font-bold group-hover:bg-[var(--surface-hover)] transition-colors shadow-sm">
+      <div className="w-8 h-8 rounded-full border-theme bg-surface-muted flex items-center justify-center text-[10px] font-bold group-hover:bg-surface-hover transition-colors shadow-sm">
         {initials}
       </div>
     </button>
@@ -163,26 +164,28 @@ export function AccountMenu({ user }: AccountMenuProps) {
       {menuTrigger}
 
       {open && (
-        <div className="absolute right-0 top-12 z-[100] w-72 rounded-[24px] border-theme bg-[var(--background)] shadow-[0_20px_50px_rgba(0,0,0,0.2)] p-2.5 flex flex-col gap-1.5 animate-in fade-in slide-in-from-top-4 duration-500 spring-bounce shadow-bloom">
+        <div className="absolute right-0 top-[calc(100%+0.75rem)] z-100 w-[min(18rem,calc(100vw-1.5rem))] max-w-[calc(100vw-1rem)] rounded-3xl border-theme bg-background shadow-[0_20px_50px_rgba(0,0,0,0.2)] p-2.5 flex flex-col gap-1.5 animate-in fade-in slide-in-from-top-4 duration-500 spring-bounce shadow-bloom">
           
           {/* Header: Identity & Quick Toggles */}
-          <div className="px-3 py-2.5 flex items-center justify-between border-b border-[var(--border-color)] mb-1 bg-[var(--surface-muted)] rounded-t-2xl">
+          <div className="px-3 py-2.5 flex items-center justify-between border-b border-border mb-1 bg-surface-muted rounded-t-2xl">
             <div className="min-w-0">
               <p className="text-xs font-black truncate tracking-tight">{user.name}</p>
               <p className="text-[10px] opacity-60 truncate font-medium">{user.email}</p>
             </div>
-            <div className="flex items-center gap-1.5 bg-[var(--background)] p-1 rounded-xl border-theme shadow-inner">
+            <div className="flex items-center gap-1.5 bg-background p-1 rounded-theme border-theme shadow-inner">
               <button
                 onClick={() => setGridEnabled(!gridEnabled)}
-                className={`p-1.5 rounded-lg transition-all ${gridEnabled ? "accent-fill" : "opacity-40 hover:opacity-100"}`}
+                className={`p-1.5 rounded-lg transition-all focus-ring ${gridEnabled ? "accent-fill" : "opacity-40 hover:opacity-100"}`}
                 title="Toggle Grid"
+                aria-label="Toggle grid overlay"
               >
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="3" y="3" width="18" height="18" rx="2" /><line x1="3" y1="9" x2="21" y2="9" /><line x1="9" y1="3" x2="9" y2="21" /></svg>
               </button>
               <button
                 onClick={() => setIsDark(!isDark)}
-                className={`p-1.5 rounded-lg transition-all ${isDark ? "accent-fill" : "opacity-40 hover:opacity-100"}`}
+                className={`p-1.5 rounded-lg transition-all focus-ring ${isDark ? "accent-fill" : "opacity-40 hover:opacity-100"}`}
                 title="Toggle Dark Mode"
+                aria-label="Toggle dark mode"
               >
                 {isDark ? <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 12.79A9 9 0 1111.21 3 7 7 0 0021 12.79z" /></svg> : <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="12" cy="12" r="5" /><line x1="12" y1="1" x2="12" y2="3" /><line x1="1" y1="12" x2="3" y2="12" /></svg>}
               </button>
@@ -193,26 +196,26 @@ export function AccountMenu({ user }: AccountMenuProps) {
             <Link
               href="/dashboard"
               onClick={() => setOpen(false)}
-              className={`flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold transition-all haptic-press hover-surface ${pathname === "/dashboard" ? "bg-[var(--accent-color)]/10 text-[var(--accent-color)]" : ""}`}
+              className={`flex items-center gap-2 px-3 py-2 rounded-theme text-[11px] font-bold transition-all haptic-press hover-surface focus-ring ${pathname === "/dashboard" ? "bg-accent/10 text-accent" : ""}`}
             >
               Dashboard
             </Link>
             <Link
               href="/profile"
               onClick={() => setOpen(false)}
-              className="flex items-center gap-2 px-3 py-2 rounded-xl text-[11px] font-bold transition-all haptic-press hover-surface"
+              className="flex items-center gap-2 px-3 py-2 rounded-theme text-[11px] font-bold transition-all haptic-press hover-surface focus-ring"
             >
               Profile Settings
             </Link>
           </div>
 
-          <div className="h-px bg-[var(--border-color)] mx-2 my-1" />
+          <div className="h-px bg-border mx-2 my-1" />
 
           {/* System Legibility Accordion */}
           <div className="flex flex-col">
             <button
               onClick={() => setShowAccessibility(!showAccessibility)}
-              className={`flex items-center justify-between px-3 py-2 rounded-xl text-[11px] font-bold transition-all hover-surface ${showAccessibility ? "bg-[var(--surface-muted)]" : ""}`}
+              className={`flex items-center justify-between px-3 py-2 rounded-theme text-[11px] font-bold transition-all hover-surface focus-ring ${showAccessibility ? "bg-surface-muted" : ""}`}
             >
               System Legibility
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform duration-300 ${showAccessibility ? "rotate-180" : ""}`}><path d="m6 9 6 6 6-6"/></svg>
@@ -243,7 +246,7 @@ export function AccountMenu({ user }: AccountMenuProps) {
           <div className="flex flex-col">
             <button
               onClick={() => setShowSimulation(!showSimulation)}
-              className={`flex items-center justify-between px-3 py-2 rounded-xl text-[11px] font-bold transition-all hover-surface ${showSimulation ? "bg-[var(--surface-muted)]" : ""}`}
+              className={`flex items-center justify-between px-3 py-2 rounded-theme text-[11px] font-bold transition-all hover-surface focus-ring ${showSimulation ? "bg-surface-muted" : ""}`}
             >
               Simulation Mode
               <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" className={`transition-transform duration-300 ${showSimulation ? "rotate-180" : ""}`}><path d="m6 9 6 6 6-6"/></svg>
@@ -254,7 +257,7 @@ export function AccountMenu({ user }: AccountMenuProps) {
                   <button
                     key={role}
                     onClick={() => switchRole(role)}
-                    className={`w-full flex items-start gap-3 px-3 py-2 rounded-xl text-left transition-all haptic-press hover-surface ${user.roles.includes(role) ? "bg-[var(--surface-muted)] ring-1 ring-[var(--border-color)]" : ""}`}
+                    className={`focus-ring flex min-h-11 w-full items-start gap-3 rounded-theme px-3 py-2 text-left transition-all haptic-press hover-surface ${user.roles.includes(role) ? "bg-surface-muted ring-1 ring-border" : ""}`}
                   >
                     <span className={`w-2 h-2 rounded-full ${config.dot} mt-1.5 shrink-0`} />
                     <div className="min-w-0">
@@ -268,11 +271,11 @@ export function AccountMenu({ user }: AccountMenuProps) {
           </div>
           )}
 
-          <div className="h-px bg-[var(--border-color)] mx-2 my-1" />
+          <div className="h-px bg-border mx-2 my-1" />
 
           <button
             onClick={logout}
-            className="w-full text-center py-2 text-label font-black opacity-60 hover:opacity-100 transition-opacity"
+            className="w-full text-center py-2 text-label font-black opacity-60 hover:opacity-100 transition-opacity focus-ring"
           >
             Sign Out
           </button>

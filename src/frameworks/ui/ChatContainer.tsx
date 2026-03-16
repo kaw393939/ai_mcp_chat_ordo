@@ -1,10 +1,11 @@
 "use client";
 
-import React, { useState, useMemo, useRef, useCallback } from "react";
+import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
 import { useGlobalChat } from "@/hooks/useGlobalChat";
 import { useChatScroll } from "@/hooks/useChatScroll";
 import { useTheme } from "@/components/ThemeProvider";
 import { useMentions } from "@/hooks/useMentions";
+import { useMessageScrollBoundaryLock } from "@/hooks/useMessageScrollBoundaryLock";
 import { ChatHeader } from "./ChatHeader";
 import { MessageList } from "./MessageList";
 import { ChatInput } from "./ChatInput";
@@ -14,6 +15,7 @@ import { MarkdownParserService } from "../../adapters/MarkdownParserService";
 import { CommandParserService } from "../../adapters/CommandParserService";
 import { useUICommands } from "@/hooks/useUICommands";
 import { useCommandRegistry } from "@/hooks/useCommandRegistry";
+import { supportsReducedMotion, supportsViewTransitions } from "@/lib/ui/browserSupport";
 import { commandRegistry } from "../../core/commands/CommandRegistry";
 
 interface Props {
@@ -21,11 +23,14 @@ interface Props {
   onClose?: () => void;
 }
 
+const EMBEDDED_CONTAINER_CLASSES =
+  "relative grid h-full min-h-0 flex-1 grid-rows-[minmax(0,1fr)_auto] bg-background";
+
 export const ChatContainer: React.FC<Props> = ({
   isFloating = false,
-  onClose,
+  onClose: _onClose,
 }) => {
-  const { messages, input, isSending, canSend, setInput, sendMessage, conversationId, conversations, isLoadingMessages } =
+  const { messages, input, isSending, canSend, setInput, sendMessage, conversationId, isLoadingMessages } =
     useGlobalChat();
   const {
     accessibility,
@@ -47,7 +52,7 @@ export const ChatContainer: React.FC<Props> = ({
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [sessionSearchQuery, setSessionSearchQuery] = useState("");
   const [mentionIndex, setMentionIndex] = useState(0);
-  const [showHistory, setShowHistory] = useState(false);
+  const [isClientReadyForTransitions, setIsClientReadyForTransitions] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
 
@@ -83,6 +88,8 @@ export const ChatContainer: React.FC<Props> = ({
   const { scrollRef, isAtBottom, scrollToBottom, handleScroll } =
     useChatScroll(presentedMessages);
 
+  useMessageScrollBoundaryLock(scrollRef, !isFloating);
+
   // Handle Input Change
   const handleInputChange = useCallback((val: string, selectionStart: number) => {
     setInput(val);
@@ -104,11 +111,30 @@ export const ChatContainer: React.FC<Props> = ({
     await sendMessage();
   };
 
+  useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setIsClientReadyForTransitions(true);
+    });
+
+    return () => {
+      window.cancelAnimationFrame(frame);
+    };
+  }, []);
+
+  const canUseViewTransitions = useMemo(
+    () => isClientReadyForTransitions && supportsViewTransitions() && !supportsReducedMotion(),
+    [isClientReadyForTransitions],
+  );
+
   if (isFloating && !isOpen) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 end-6 z-[60] w-16 h-16 rounded-full accent-fill shadow-[-20px_20px_60px_rgba(0,0,0,0.4)] flex items-center justify-center hover:scale-110 active:scale-95 transition-all duration-300 group overflow-hidden"
+        className="fixed bottom-6 inset-e-6 z-60 flex h-16 w-16 items-center justify-center overflow-hidden rounded-full accent-fill shadow-[-20px_20px_60px_rgba(0,0,0,0.4)] transition-all duration-300 group hover:scale-110 active:scale-95 focus-ring"
+        style={{
+          insetBlockEnd: "max(1.5rem, var(--safe-area-inset-bottom))",
+          insetInlineEnd: "max(1.5rem, var(--safe-area-inset-right))",
+        }}
         aria-label="Ask PD Advisor"
       >
         <div className="absolute inset-0 bg-white/10 opacity-0 group-hover:opacity-100 transition-opacity" />
@@ -120,18 +146,33 @@ export const ChatContainer: React.FC<Props> = ({
   }
 
   const containerClasses = isFloating
-    ? `fixed z-[60] transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] shadow-[-40px_40px_80px_rgba(0,0,0,0.5)] flex flex-col overflow-hidden backdrop-blur-3xl bg-[var(--background)]/95 border-theme
-       ${isFullScreen 
-         ? "top-0 start-0 w-full h-full rounded-none" 
-         : "bottom-6 end-6 w-[calc(100vw-3rem)] md:w-[480px] h-[calc(100dvh-6rem)] md:h-[calc(100dvh-10rem)] max-h-[820px] rounded-[32px]"}`
-    : "flex flex-1 flex-col relative bg-[var(--background)] min-h-0 overflow-hidden";
-  
-  const sectionStyle = {
-    viewTransitionName: "chat-container"
-  } as React.CSSProperties;
+    ? `glass-surface fixed z-60 flex flex-col overflow-hidden border-theme shadow-[-40px_40px_80px_rgba(0,0,0,0.5)] transition-all duration-500 ease-[cubic-bezier(0.23,1,0.32,1)] ${isFullScreen ? "inset-0 rounded-none" : "rounded-[32px]"}`
+    : EMBEDDED_CONTAINER_CLASSES;
+
+  const sectionStyle: React.CSSProperties = {};
+
+  if (canUseViewTransitions) {
+    sectionStyle.viewTransitionName = "chat-container";
+  }
+
+  if (isFloating) {
+    if (isFullScreen) {
+      sectionStyle.blockSize = "var(--viewport-block-size)";
+    } else {
+      sectionStyle.insetBlockEnd = "max(1.5rem, var(--safe-area-inset-bottom))";
+      sectionStyle.insetInlineEnd = "max(1.5rem, var(--safe-area-inset-right))";
+      sectionStyle.inlineSize = "min(30rem, calc(100vw - max(1.5rem, var(--safe-area-inset-left)) - max(1.5rem, var(--safe-area-inset-right))))";
+      sectionStyle.blockSize = "min(820px, calc(var(--viewport-block-size) - max(1.5rem, var(--safe-area-inset-top)) - max(1.5rem, var(--safe-area-inset-bottom)) - 3rem))";
+    }
+  }
 
   return (
-    <section className={containerClasses} style={sectionStyle}>
+    <section
+      className={containerClasses}
+      style={sectionStyle}
+      data-chat-container-mode={isFloating ? "floating" : "embedded"}
+      data-chat-layout={isFloating ? undefined : "message-composer"}
+    >
       {isFloating && (
         <ChatHeader
           title="PD Advisor"
@@ -154,32 +195,17 @@ export const ChatContainer: React.FC<Props> = ({
         />
       )}
 
-      {/* Conversation history toggle — only show when there are conversations */}
-      {isFloating && conversations.length > 0 && (
-        <div className="border-b border-[var(--border-color)]">
-          <button
-            onClick={() => setShowHistory(!showHistory)}
-            className="w-full flex items-center justify-between px-4 py-2 text-[10px] font-bold uppercase tracking-wider opacity-40 hover:opacity-70 transition-opacity"
-          >
-            <span>History ({conversations.length})</span>
-            <svg
-              width="10" height="10"
-              viewBox="0 0 24 24"
-              fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round"
-              className={`transition-transform ${showHistory ? "rotate-180" : ""}`}
-            >
-              <polyline points="6 9 12 15 18 9" />
-            </svg>
-          </button>
-          {showHistory && (
-            <div className="max-h-48 overflow-y-auto">
+      {/* New conversation action — only show when there's an active conversation */}
+      {isFloating && conversationId && (
+        <div className="border-b border-color-theme">
               <ConversationSidebar />
-            </div>
-          )}
         </div>
       )}
 
-      <div className="relative flex-1 min-h-0 flex flex-col w-full overflow-hidden">
+      <div
+        className="relative flex min-h-0 w-full flex-col overflow-hidden"
+        data-chat-message-region={isFloating ? undefined : "true"}
+      >
         {/* Nuanced Background Branding */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden opacity-[0.03] dark:opacity-[0.02]">
           <div className="text-[15rem] sm:text-[22rem] lg:text-[30rem] font-bold leading-none select-none tracking-tighter">O</div>
@@ -189,12 +215,16 @@ export const ChatContainer: React.FC<Props> = ({
         <div 
           ref={scrollRef}
           onScroll={handleScroll}
-          className={`flex-1 overflow-y-auto px-3 sm:px-6 py-3 sm:py-4 overscroll-contain z-10 min-h-0 ${!isFloating ? "pt-2" : ""}`}
+          className={`z-10 flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-3 sm:px-6 sm:py-4 ${!isFloating ? "pt-2" : ""}`}
+          data-chat-message-viewport={isFloating ? undefined : "true"}
         >
           {isLoadingMessages ? (
             <div className="flex items-center justify-center h-32 text-xs opacity-40 animate-pulse">Loading conversation…</div>
           ) : (
-          <div className={isFullScreen ? "max-w-4xl mx-auto w-full" : "w-full"}>
+          <div
+            className={`${isFullScreen ? "max-w-4xl mx-auto w-full" : "w-full"} ${!isFloating ? "min-h-full flex flex-col justify-end" : ""}`}
+            data-chat-message-stack={isFloating ? undefined : "true"}
+          >
             <MessageList
               messages={presentedMessages}
               isSending={isSending}
@@ -202,15 +232,16 @@ export const ChatContainer: React.FC<Props> = ({
               onSuggestionClick={handleSuggestionClick}
               onLinkClick={handleLinkClick}
               searchQuery={sessionSearchQuery}
+              isEmbedded={!isFloating}
             />
           </div>
           )}
         </div>
         {!isAtBottom && (
-          <div className="absolute bottom-4 left-0 right-0 flex justify-center pointer-events-none z-10">
+          <div className="absolute bottom-[max(1rem,var(--safe-area-inset-bottom))] left-0 right-0 z-10 flex justify-center pointer-events-none px-3">
             <button
               onClick={() => scrollToBottom()}
-              className="pointer-events-auto accent-fill px-4 py-2 rounded-full text-[11px] font-bold shadow-xl hover:scale-105 transition-all outline-none"
+              className="pointer-events-auto focus-ring min-h-11 rounded-full accent-fill px-4 py-2 text-[11px] font-bold shadow-xl transition-all hover:scale-105"
               aria-label="Scroll to bottom"
             >
               ↓ Scroll to bottom
@@ -219,7 +250,10 @@ export const ChatContainer: React.FC<Props> = ({
         )}
       </div>
 
-      <div className="flex-none bg-[var(--background)] px-3 sm:px-6 pt-3 pb-4 sm:pb-5 border-t border-[var(--border-color)]">
+      <div
+        className={`flex-none border-t border-color-theme bg-background px-3 pt-3 pb-4 sm:px-(--container-padding) sm:pb-5 ${isFloating && isFullScreen ? "safe-area-px safe-area-pb" : ""}`}
+        data-chat-composer-row={isFloating ? undefined : "true"}
+      >
         <div className={isFullScreen ? "max-w-4xl mx-auto w-full" : "w-full"}>
           <ChatInput
             value={input}

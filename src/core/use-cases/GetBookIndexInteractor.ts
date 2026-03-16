@@ -1,5 +1,5 @@
-import { UseCase } from "../common/UseCase";
-import { BookRepository } from "./BookRepository";
+import type { UseCase } from "../common/UseCase";
+import type { BookRepository } from "./BookRepository";
 
 export interface ChapterIndex {
   bookSlug: string;

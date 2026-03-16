@@ -20,6 +20,8 @@ describe("observability helpers", () => {
   it("maps known validation errors to stable codes", () => {
     expect(getErrorCode("messages must be a non-empty array.")).toBe("VALIDATION_ERROR");
     expect(getErrorCode("No user message found.")).toBe("VALIDATION_ERROR");
+    expect(getErrorCode("No active conversation", 404)).toBe("NOT_FOUND");
+    expect(getErrorCode("Authentication required", 401)).toBe("AUTH_ERROR");
     expect(getErrorCode("provider timeout")).toBe("PROVIDER_ERROR");
     expect(getErrorCode("unknown problem")).toBe("INTERNAL_ERROR");
   });

@@ -94,7 +94,7 @@ beforeEach(async () => {
   deps = {
     corpusDir,
     vectorStore: mockVectorStore,
-    clearCaches,
+    clearCaches: clearCaches as unknown as () => void,
   };
 });
 

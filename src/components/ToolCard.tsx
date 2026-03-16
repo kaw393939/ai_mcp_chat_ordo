@@ -45,67 +45,69 @@ export function ToolCard({
     return (
       <Dialog.Root open={isExpanded} onOpenChange={setIsExpanded}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-[99999] bg-[var(--background)]/80 backdrop-blur-md animate-in fade-in duration-200" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-[100000] w-[calc(100vw-2rem)] max-w-7xl h-[90dvh] md:h-[90vh] -translate-x-1/2 -translate-y-1/2 bg-surface text-[var(--foreground)] rounded-2xl shadow-2xl flex flex-col border border-border animate-in zoom-in-95 duration-200">
-            {/* Header */}
-            <div className="flex items-center justify-between p-4 border-b border-border">
-              <div className="flex items-center gap-3">
-                <span className="text-xl">{icon}</span>
-                <div>
-                  <Dialog.Title className="font-semibold text-lg m-0">{title}</Dialog.Title>
-                  {subtitle && (
-                    <Dialog.Description className="text-sm opacity-60 mt-0.5 m-0 mb-0.5">{subtitle}</Dialog.Description>
+          <Dialog.Overlay className="glass-overlay fixed inset-0 z-[99999] animate-in fade-in duration-200" />
+          <Dialog.Content className="fixed inset-0 z-[100000] flex items-start justify-center p-3 pt-[max(0.75rem,var(--safe-area-inset-top))] pb-[max(0.75rem,var(--safe-area-inset-bottom))] sm:p-6 sm:pt-[max(1.5rem,var(--safe-area-inset-top))] sm:pb-[max(1.5rem,var(--safe-area-inset-bottom))] outline-none">
+            <div className="glass-surface flex max-h-full w-full max-w-7xl flex-col overflow-hidden rounded-[28px] border-theme text-foreground shadow-[0_32px_90px_rgba(15,23,42,0.2)] animate-in zoom-in-95 duration-200">
+              <div className="flex items-center justify-between border-b border-border bg-surface/80 p-4 sm:p-5">
+                <div className="flex items-center gap-3">
+                  <span className="text-xl">{icon}</span>
+                  <div>
+                    <Dialog.Title className="m-0 text-lg font-semibold">{title}</Dialog.Title>
+                    {subtitle && (
+                      <Dialog.Description className="m-0 mb-0.5 mt-0.5 text-sm opacity-60">{subtitle}</Dialog.Description>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {onDownload && (
+                    <button
+                      onClick={onDownload}
+                      title={downloadTooltip}
+                      className="focus-ring min-h-11 min-w-11 rounded-lg p-2 opacity-70 transition-all hover:bg-surface-hover hover:opacity-100 active:scale-90"
+                      aria-label="Download"
+                    >
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                        <polyline points="7 10 12 15 17 10" />
+                        <line x1="12" y1="15" x2="12" y2="3" />
+                      </svg>
+                    </button>
                   )}
+                  <Dialog.Close asChild>
+                    <button
+                      className="focus-ring min-h-11 min-w-11 rounded-lg bg-surface-hover/50 p-2 text-text transition-all hover:bg-surface-hover active:scale-90"
+                      aria-label="Close"
+                    >
+                      <svg
+                        width="20"
+                        height="20"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                      >
+                        <line x1="18" y1="6" x2="6" y2="18" />
+                        <line x1="6" y1="6" x2="18" y2="18" />
+                      </svg>
+                    </button>
+                  </Dialog.Close>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                {onDownload && (
-                  <button
-                    onClick={onDownload}
-                    title={downloadTooltip}
-                    className="p-2 rounded-lg hover:bg-surface-hover transition-all active:scale-90 opacity-70 hover:opacity-100"
-                  >
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-                      <polyline points="7 10 12 15 17 10" />
-                      <line x1="12" y1="15" x2="12" y2="3" />
-                    </svg>
-                  </button>
-                )}
-                <Dialog.Close asChild>
-                  <button
-                    className="p-2 rounded-lg hover:bg-surface-hover transition-all active:scale-90 bg-surface-hover/50 text-text"
-                  >
-                    <svg
-                      width="20"
-                      height="20"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <line x1="18" y1="6" x2="6" y2="18" />
-                      <line x1="6" y1="6" x2="18" y2="18" />
-                    </svg>
-                  </button>
-                </Dialog.Close>
-              </div>
-            </div>
 
-            {/* Content */}
-            <div className="flex-1 overflow-auto p-6 flex flex-col items-center justify-center">
-              {children}
+              <div className="flex-1 overflow-auto p-4 sm:p-6 flex flex-col items-center justify-center">
+                {children}
+              </div>
             </div>
           </Dialog.Content>
         </Dialog.Portal>
@@ -116,7 +118,7 @@ export function ToolCard({
   return (
     <>
       <div
-        className={`flex flex-col rounded-xl border border-border bg-surface-hover/30 shadow-sm overflow-hidden my-2 max-w-full relative transition-all duration-300 ${className}`}
+        className={`flex flex-col rounded-theme border-theme bg-surface-hover/30 shadow-sm overflow-hidden my-2 max-w-full relative transition-all duration-300 ${className}`}
       >
         {/* Visual Header */}
         <div className="flex items-center justify-between px-3 py-2 border-b border-border/50 bg-surface-muted">
@@ -150,7 +152,8 @@ export function ToolCard({
                   <button
                     onClick={onDownload}
                     title={downloadTooltip}
-                    className="w-7 h-7 flex items-center justify-center rounded-md hover-surface text-[var(--foreground)] opacity-50 hover:opacity-100 transition-all active:scale-90"
+                    className="w-7 h-7 flex items-center justify-center rounded-md hover-surface text-foreground opacity-50 hover:opacity-100 transition-all active:scale-90 focus-ring"
+                    aria-label="Download"
                   >
                     <svg
                       width="14"
@@ -172,7 +175,8 @@ export function ToolCard({
                   <button
                     onClick={toggleExpand}
                     title="Expand full screen"
-className="w-7 h-7 flex items-center justify-center rounded-md hover-surface text-[var(--foreground)] opacity-50 hover:opacity-100 transition-all active:scale-90"
+                    className="focus-ring flex h-9 min-w-9 items-center justify-center rounded-md text-foreground opacity-50 transition-all hover:opacity-100 hover-surface active:scale-90 sm:h-8 sm:min-w-8"
+                    aria-label="Expand full screen"
                   >
                     <svg
                       width="14"
@@ -201,14 +205,14 @@ className="w-7 h-7 flex items-center justify-center rounded-md hover-surface tex
           <button
             type="button"
             onClick={toggleExpand}
-            className="w-full relative cursor-pointer group"
+            className="focus-ring relative w-full cursor-pointer group"
           >
             <div className="max-h-[80px] overflow-hidden pointer-events-none">
               {children}
             </div>
-            <div className="absolute inset-0 bg-gradient-to-t from-[var(--surface)] via-[var(--surface)]/60 to-transparent" />
+            <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/60 to-transparent" />
             <div className="absolute inset-0 flex items-center justify-center">
-              <span className="text-[11px] font-semibold uppercase tracking-wider opacity-70 group-hover:opacity-100 transition-opacity bg-[var(--surface-muted)] border-theme rounded-full px-3 py-1">
+              <span className="text-[11px] font-semibold uppercase tracking-wider opacity-70 group-hover:opacity-100 transition-opacity bg-surface-muted border-theme rounded-full px-3 py-1">
                 View diagram
               </span>
             </div>

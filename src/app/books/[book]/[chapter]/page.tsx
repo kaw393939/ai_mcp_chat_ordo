@@ -1,4 +1,4 @@
-import { getBooks, getChapterFull, getBookSummaries } from "@/lib/book-library";
+import { getChapterFull, getBookSummaries } from "@/lib/book-library";
 import { ResourceNotFoundError } from "@/core/entities/errors";
 import { notFound } from "next/navigation";
 import ReactMarkdown from "react-markdown";
@@ -51,7 +51,7 @@ export default async function ChapterPage({
           ),
           h2: ({ node: _node, ...props }) => (
             <h2
-              className="text-2xl sm:text-3xl font-bold mb-4 mt-12 border-b border-theme border-color-theme pb-2"
+              className="text-2xl sm:text-3xl font-bold mb-4 mt-12 border-b border-theme pb-2"
               {...props}
             />
           ),
@@ -66,7 +66,7 @@ export default async function ChapterPage({
           ),
           a: ({ node: _node, ...props }) => (
             <a
-              className="text-accent-theme underline hover:opacity-80 transition-opacity font-medium"
+              className="text-accent underline hover:opacity-80 transition-opacity font-medium"
               {...props}
             />
           ),
@@ -85,21 +85,22 @@ export default async function ChapterPage({
           li: ({ node: _node, ...props }) => <li className="" {...props} />,
           blockquote: ({ node: _node, ...props }) => (
             <blockquote
-              className="border-l-4 border-accent-theme pl-6 italic opacity-80 my-8 text-xl"
+              className="border-l-4 border-accent pl-6 italic opacity-80 my-8 text-xl"
               {...props}
             />
           ),
            
           img: ({ node: _node, alt, ...props }) => (
+            // eslint-disable-next-line @next/next/no-img-element
             <img
               alt={alt || ""}
-              className="rounded-theme shadow-theme my-10 max-w-full border-theme border-color-theme"
+              className="rounded-theme shadow-theme my-10 max-w-full border-theme"
               {...props}
             />
           ),
           pre: ({ node: _node, ...props }) => (
             <pre
-              className="code-chrome p-6 rounded-theme overflow-x-auto mb-8 text-sm shadow-theme font-mono border-theme border-color-theme"
+              className="code-chrome p-6 rounded-theme overflow-x-auto mb-8 text-sm shadow-theme font-mono border-theme"
               {...props}
             />
           ),
@@ -107,7 +108,7 @@ export default async function ChapterPage({
           code: ({ node: _node, inline, ...props }: any) =>
             inline ? (
               <code
-                className="bg-[var(--surface-muted)] px-1.5 py-0.5 rounded-theme text-sm border-theme border-color-theme font-mono"
+                className="bg-surface-muted px-1.5 py-0.5 rounded-theme text-sm border-theme font-mono"
                 {...props}
               />
             ) : (
@@ -120,13 +121,13 @@ export default async function ChapterPage({
           ),
           th: ({ node: _node, ...props }) => (
             <th
-              className="border border-theme border-color-theme px-4 py-2 text-left font-bold bg-[var(--surface-muted)]"
+              className="border border-color-theme px-4 py-2 text-left font-bold bg-surface-muted"
               {...props}
             />
           ),
           td: ({ node: _node, ...props }) => (
             <td
-              className="border border-theme border-color-theme px-4 py-2"
+              className="border border-color-theme px-4 py-2"
               {...props}
             />
           ),

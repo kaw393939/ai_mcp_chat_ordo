@@ -1,69 +1,45 @@
 "use client";
 
-import React from "react";
+import React, { useState } from "react";
 import { useGlobalChat } from "@/hooks/useGlobalChat";
 
 export const ConversationSidebar: React.FC = () => {
-  const {
-    conversations,
-    conversationId,
-    isLoadingConversations,
-    loadConversation,
-    newConversation,
-    deleteConversation,
-  } = useGlobalChat();
+  const { archiveConversation, conversationId } = useGlobalChat();
+  const [showConfirm, setShowConfirm] = useState(false);
 
-  if (!isLoadingConversations && conversations.length === 0 && !conversationId) return null;
+  // Only show "New Chat" when there's an active conversation to archive
+  if (!conversationId) return null;
 
   return (
     <div className="flex flex-col gap-1 px-2 py-2">
-      <button
-        onClick={newConversation}
-        className="flex items-center gap-2 px-3 py-2 rounded-xl text-xs font-bold opacity-70 hover:opacity-100 hover-surface transition-all"
-      >
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-          <line x1="12" y1="5" x2="12" y2="19" />
-          <line x1="5" y1="12" x2="19" y2="12" />
-        </svg>
-        New Chat
-      </button>
-
-      {isLoadingConversations ? (
-        <div className="px-3 py-3 text-[10px] opacity-40 animate-pulse">Loading conversations…</div>
-      ) : (
-        conversations.map((conv) => (
-        <div
-          key={conv.id}
-          className={`group flex items-center gap-2 px-3 py-2 rounded-xl text-xs cursor-pointer transition-all ${
-            conv.id === conversationId
-              ? "accent-fill font-bold"
-              : "opacity-60 hover:opacity-100 hover-surface"
-          }`}
+      {!showConfirm ? (
+        <button
+          onClick={() => setShowConfirm(true)}
+          className="flex items-center gap-2 px-3 py-2 rounded-theme text-xs font-bold opacity-70 hover:opacity-100 hover-surface transition-all"
         >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <line x1="12" y1="5" x2="12" y2="19" />
+            <line x1="5" y1="12" x2="19" y2="12" />
+          </svg>
+          New Chat
+        </button>
+      ) : (
+        <div className="flex items-center gap-2 px-3 py-2 text-xs">
+          <span className="opacity-60">Start fresh? Your current conversation will be saved and searchable.</span>
           <button
-            onClick={() => loadConversation(conv.id)}
-            className="flex-1 text-left truncate"
+            onClick={() => { archiveConversation(); setShowConfirm(false); }}
+            className="shrink-0 px-2 py-1 rounded-lg accent-fill font-bold"
           >
-            {conv.title || "Untitled"}
+            Start fresh
           </button>
-          <span className="text-[9px] opacity-40 shrink-0">
-            {conv.messageCount}
-          </span>
           <button
-            onClick={(e) => {
-              e.stopPropagation();
-              deleteConversation(conv.id);
-            }}
-            className="opacity-0 group-hover:opacity-60 hover:!opacity-100 transition-opacity shrink-0"
-            aria-label={`Delete conversation: ${conv.title || "Untitled"}`}
+            onClick={() => setShowConfirm(false)}
+            className="shrink-0 px-2 py-1 rounded-lg opacity-60 hover:opacity-100"
           >
-            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
+            Cancel
           </button>
         </div>
-      )))}
+      )}
     </div>
   );
 };

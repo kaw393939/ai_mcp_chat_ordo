@@ -1,4 +1,4 @@
-import { StreamEvent } from "../../core/entities/chat-stream";
+import type { StreamEvent } from "../../core/entities/chat-stream";
 
 type RawSSEData = Record<string, unknown>;
 

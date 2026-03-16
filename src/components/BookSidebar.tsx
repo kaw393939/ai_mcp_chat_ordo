@@ -22,14 +22,15 @@ export function BookSidebar({ book, chapters, currentChapterSlug }: BookSidebarP
 
   return (
     <aside 
-      className={`relative transition-all duration-500 ease-in-out border-r border-[var(--border-color)] bg-[var(--surface)] flex flex-col h-screen sticky top-0 ${
+      className={`relative transition-all duration-500 ease-in-out border-r border-color-theme bg-surface flex flex-col h-full ${
         isCollapsed ? "w-16" : "w-72"
       }`}
     >
       {/* Collapse Toggle */}
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
-        className="absolute -right-3 top-10 w-6 h-6 bg-[var(--surface)] border-theme rounded-full flex items-center justify-center z-50 hover:bg-[var(--accent-color)] hover:text-[var(--accent-foreground)] transition-colors shadow-sm"
+        className="absolute -right-3 top-10 w-6 h-6 bg-surface border-theme rounded-full flex items-center justify-center z-50 hover:bg-accent hover:text-accent-foreground transition-colors shadow-sm focus-ring"
+        aria-label="Toggle sidebar"
       >
         <svg
           width="12"
@@ -46,7 +47,7 @@ export function BookSidebar({ book, chapters, currentChapterSlug }: BookSidebarP
         </svg>
       </button>
 
-      <div className={`flex-1 overflow-y-auto overflow-x-hidden flex flex-col p-6 gap-8 ${isCollapsed ? "items-center px-0" : ""}`}>
+      <div className={`flex-1 overflow-y-auto overflow-x-hidden flex flex-col p-[var(--container-padding)] gap-8 ${isCollapsed ? "items-center px-0" : ""}`}>
         {/* Header Section */}
         <div className={`flex flex-col gap-4 ${isCollapsed ? "hidden" : "animate-in fade-in duration-500"}`}>
           <Link
@@ -59,7 +60,7 @@ export function BookSidebar({ book, chapters, currentChapterSlug }: BookSidebarP
             Library
           </Link>
           <div className="flex flex-col gap-1">
-            <span className="text-label text-[var(--accent-color)] opacity-80">
+            <span className="text-label text-accent opacity-80">
               Book {book.number}
             </span>
             <h2 className="text-sm font-bold tracking-tight leading-tight">
@@ -82,7 +83,7 @@ export function BookSidebar({ book, chapters, currentChapterSlug }: BookSidebarP
               title={isCollapsed ? chapter.title : undefined}
             >
               <div className={`w-1.5 h-1.5 rounded-full shrink-0 transition-all ${
-                currentChapterSlug === chapter.slug ? "bg-white scale-125" : "bg-[var(--border-color)] group-hover:bg-[var(--accent-color)]"
+                currentChapterSlug === chapter.slug ? "bg-white scale-125" : "bg-border group-hover:bg-accent"
               }`} />
               {!isCollapsed && (
                 <span className="text-xs font-medium truncate animate-in slide-in-from-left-2 duration-300">
@@ -94,14 +95,14 @@ export function BookSidebar({ book, chapters, currentChapterSlug }: BookSidebarP
         </nav>
 
         {/* Footer Section */}
-        <div className={`mt-auto flex flex-col gap-6 pt-6 border-t border-[var(--border-color)] ${isCollapsed ? "items-center px-0" : ""}`}>
+        <div className={`mt-auto flex flex-col gap-6 pt-6 border-t border-color-theme ${isCollapsed ? "items-center px-0" : ""}`}>
           <div className={isCollapsed ? "scale-75 origin-center" : ""}>
             <ThemeSwitcher />
           </div>
           {!isCollapsed && (
             <Link
               href="/"
-              className="text-label tracking-[0.2em] text-[var(--accent-color)] hover:opacity-80 transition-opacity animate-in fade-in duration-500"
+              className="text-label tracking-[0.2em] text-accent hover:opacity-80 transition-opacity animate-in fade-in duration-500"
             >
               ← Back to Chat
             </Link>

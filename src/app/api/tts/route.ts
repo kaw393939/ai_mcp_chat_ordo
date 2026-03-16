@@ -1,5 +1,9 @@
 import { NextResponse } from "next/server";
+import fs from "fs";
 import { getSessionUser } from "@/lib/auth";
+import { getDb } from "@/lib/db";
+import { UserFileDataMapper } from "@/adapters/UserFileDataMapper";
+import { UserFileSystem } from "@/lib/user-files";
 
 // --- ElevenLabs (disabled — uncomment to re-enable as primary provider) ---
 // const ELEVENLABS_API_KEY = process.env.ELEVENLABS_API_KEY ?? "";
@@ -16,7 +20,7 @@ export async function POST(req: Request) {
     }
 
     const body = await req.json();
-    const { text } = body;
+    const { text, conversationId } = body;
 
     if (!text) {
       return NextResponse.json(
@@ -25,7 +29,25 @@ export async function POST(req: Request) {
       );
     }
 
-    // --- OpenAI TTS (default) — streams response directly to client ---
+    const repo = new UserFileDataMapper(getDb());
+    const ufs = new UserFileSystem(repo);
+
+    // Check cache — return stored file if it exists
+    const cached = await ufs.lookup(user.id, text, "audio");
+    if (cached) {
+      const data = fs.readFileSync(cached.diskPath);
+      return new NextResponse(data, {
+        status: 200,
+        headers: {
+          "Content-Type": "audio/mpeg",
+          "Content-Length": String(data.length),
+          "Cache-Control": "private, max-age=86400, immutable",
+          "X-User-File-Id": cached.file.id,
+        },
+      });
+    }
+
+    // --- OpenAI TTS (default) — generate, cache, and return ---
     const OPENAI_API_KEY = process.env.OPENAI_API_KEY;
     if (!OPENAI_API_KEY) {
       return NextResponse.json(
@@ -57,22 +79,28 @@ export async function POST(req: Request) {
       );
     }
 
-    // Stream the audio body directly to the client — no buffering
-    const headers: HeadersInit = {
-      "Content-Type": "audio/mpeg",
-      "Transfer-Encoding": "chunked",
-      "Cache-Control": "no-cache",
-    };
+    // Buffer the full response so we can cache it to disk
+    const audioBuffer = Buffer.from(await oaResponse.arrayBuffer());
 
-    // Pass Content-Length through for client-side progress tracking
-    const contentLength = oaResponse.headers.get("Content-Length");
-    if (contentLength) {
-      headers["Content-Length"] = contentLength;
-    }
+    // Store in user filesystem
+    const userFile = await ufs.store({
+      userId: user.id,
+      conversationId: conversationId ?? null,
+      input: text,
+      fileType: "audio",
+      mimeType: "audio/mpeg",
+      extension: "mp3",
+      data: audioBuffer,
+    });
 
-    return new NextResponse(oaResponse.body, {
+    return new NextResponse(audioBuffer, {
       status: 200,
-      headers,
+      headers: {
+        "Content-Type": "audio/mpeg",
+        "Content-Length": String(audioBuffer.length),
+        "Cache-Control": "private, max-age=86400, immutable",
+        "X-User-File-Id": userFile.id,
+      },
     });
   } catch (error) {
     console.error("TTS Route Error:", error);

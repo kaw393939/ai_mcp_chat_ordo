@@ -1,6 +1,9 @@
 import { getModelFallbacks } from "@/lib/config/env";
-import { ChatPolicyInteractor } from "@/core/use-cases/ChatPolicyInteractor";
+import { ChatPolicyInteractor, ROLE_DIRECTIVES } from "@/core/use-cases/ChatPolicyInteractor";
 import { LoggingDecorator } from "@/core/common/LoggingDecorator";
+import { SystemPromptDataMapper } from "@/adapters/SystemPromptDataMapper";
+import { DefaultingSystemPromptRepository } from "@/core/use-cases/DefaultingSystemPromptRepository";
+import { getDb } from "@/lib/db";
 import type { RoleName } from "@/core/entities/user";
 
 const BASE_PROMPT = `
@@ -44,8 +47,15 @@ Rules:
 `.trim();
 
 export async function buildSystemPrompt(role: RoleName): Promise<string> {
+  const db = getDb();
+  const innerRepo = new SystemPromptDataMapper(db);
+  const promptRepo = new DefaultingSystemPromptRepository(
+    innerRepo,
+    BASE_PROMPT,
+    ROLE_DIRECTIVES,
+  );
   const interactor = new LoggingDecorator(
-    new ChatPolicyInteractor(BASE_PROMPT),
+    new ChatPolicyInteractor(promptRepo),
     "ChatPolicy",
   );
   return interactor.execute({ role });

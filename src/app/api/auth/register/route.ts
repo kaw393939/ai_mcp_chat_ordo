@@ -5,6 +5,7 @@ import {
   ValidationError,
   DuplicateEmailError,
 } from "@/core/use-cases/RegisterUserInteractor";
+import { migrateAnonymousConversationsToUser } from "@/lib/chat/migrate-anonymous-conversations";
 
 export async function POST(req: Request) {
   try {
@@ -29,6 +30,8 @@ export async function POST(req: Request) {
       secure: process.env.NODE_ENV === "production",
       maxAge: 7 * 24 * 60 * 60, // 7 days
     });
+
+    await migrateAnonymousConversationsToUser(result.user.id, "registration");
 
     return NextResponse.json({ user: result.user }, { status: 201 });
   } catch (error) {

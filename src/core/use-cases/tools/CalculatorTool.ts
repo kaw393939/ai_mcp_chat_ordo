@@ -1,4 +1,4 @@
-import { ToolCommand } from "../ToolCommand";
+import type { ToolCommand } from "../ToolCommand";
 import { calculate, isCalculatorOperation, type CalculatorResult } from "@/core/entities/calculator";
 import type { ToolExecutionContext } from "@/core/tool-registry/ToolExecutionContext";
 

@@ -15,6 +15,8 @@ describe("createMessageWithModelFallback", () => {
       messages: [{ role: "user", content: "hello" }] as never,
       toolChoice: { type: "auto" },
       options: { retryAttempts: 1, retryDelayMs: 0 },
+      systemPrompt: "system",
+      tools: [],
     });
 
     expect(response.content[0].type).toBe("text");
@@ -31,6 +33,8 @@ describe("createMessageWithModelFallback", () => {
         messages: [{ role: "user", content: "hello" }] as never,
         toolChoice: { type: "auto" },
         options: { retryAttempts: 1, retryDelayMs: 0 },
+        systemPrompt: "system",
+        tools: [],
       }),
     ).rejects.toThrow("Anthropic provider error: 401 unauthorized");
 
@@ -50,6 +54,8 @@ describe("createMessageWithModelFallback", () => {
       messages: [{ role: "user", content: "hello" }] as never,
       toolChoice: { type: "auto" },
       options: { retryAttempts: 2, retryDelayMs: 0, timeoutMs: 500 },
+      systemPrompt: "system",
+      tools: [],
     });
 
     expect(response.content[0].type).toBe("text");
@@ -72,6 +78,8 @@ describe("createMessageWithModelFallback", () => {
         messages: [{ role: "user", content: "hello" }] as never,
         toolChoice: { type: "auto" },
         options: { retryAttempts: 1, retryDelayMs: 0, timeoutMs: 1 },
+        systemPrompt: "system",
+        tools: [],
       }),
     ).rejects.toThrow("Anthropic provider error: Provider request timed out.");
   });

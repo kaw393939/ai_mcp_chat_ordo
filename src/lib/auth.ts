@@ -87,10 +87,28 @@ const ANONYMOUS_USER: SessionUser = {
   roles: ["ANONYMOUS"],
 };
 
+function tryDeleteCookie(
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
+  name: string,
+) {
+  try {
+    cookieStore.delete(name);
+  } catch {
+    // `getSessionUser()` also runs in read-only request contexts like layouts.
+  }
+}
+
+function clearStaleAuthCookies(
+  cookieStore: Awaited<ReturnType<typeof cookies>>,
+) {
+  tryDeleteCookie(cookieStore, SESSION_COOKIE_NAME);
+  tryDeleteCookie(cookieStore, MOCK_SESSION_COOKIE_NAME);
+}
+
 /**
  * Resolves the current user from the session.
  * 1. Try real session token (lms_session_token cookie → ValidateSessionInteractor)
- * 2. Fall back to legacy mock system (lms_mock_session_role cookie)
+ * 2. Optionally overlay a simulated role on a validated real session
  * 3. Default to ANONYMOUS
  */
 export async function getSessionUser(): Promise<SessionUser> {
@@ -114,16 +132,13 @@ export async function getSessionUser(): Promise<SessionUser> {
 
       return realUser;
     } catch {
-      // Invalid/expired session — fall through to mock or ANONYMOUS
+      clearStaleAuthCookies(cookieStore);
+      return ANONYMOUS_USER;
     }
   }
 
-  // 2. Fall back to legacy mock system (no real session)
   if (mockRole) {
-    const db = getDb();
-    const mapper = new UserDataMapper(db);
-    const user = mapper.findByActiveRole(mockRole);
-    if (user) return user;
+    tryDeleteCookie(cookieStore, MOCK_SESSION_COOKIE_NAME);
   }
 
   // 3. Default to ANONYMOUS
@@ -132,6 +147,7 @@ export async function getSessionUser(): Promise<SessionUser> {
 
 /**
  * Sets a mock session cookie for the role simulation system.
+ * This is only a role overlay and never a standalone auth mechanism.
  */
 export async function setMockSession(role: RoleName) {
   const cookieStore = await cookies();

@@ -3,9 +3,9 @@ import type { HybridSearchResult, VectorQuery, VectorStore } from "./types";
 import type { Embedder } from "./ports/Embedder";
 import type { BM25IndexStore } from "./ports/BM25IndexStore";
 import type { BookQuery, ChapterQuery } from "../use-cases/BookRepository";
-import { HybridSearchEngine } from "./HybridSearchEngine";
-import { BM25Scorer } from "./BM25Scorer";
-import { QueryProcessor } from "./QueryProcessor";
+import type { HybridSearchEngine } from "./HybridSearchEngine";
+import type { BM25Scorer } from "./BM25Scorer";
+import type { QueryProcessor } from "./QueryProcessor";
 
 abstract class BaseSearchHandler implements SearchHandler {
   private nextHandler: SearchHandler | null = null;
@@ -68,7 +68,9 @@ export class BM25SearchHandler extends BaseSearchHandler {
   async search(query: string, filters?: VectorQuery): Promise<HybridSearchResult[]> {
     if (!this.canHandle()) return this.passToNext(query, filters);
 
-    const bm25Index = this.bm25IndexStore.getIndex("book_chunk")!;
+    const bm25Index = this.bm25IndexStore.getIndex("book_chunk");
+    if (!bm25Index) return this.passToNext(query, filters);
+
     const queryTerms = this.bm25QueryProcessor.process(query);
     const records = this.vectorStore.getAll({ ...filters, chunkLevel: "passage" });
 

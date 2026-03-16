@@ -1,6 +1,6 @@
-import { UseCase } from "../common/UseCase";
-import { BookRepository } from "./BookRepository";
-import { Checklist } from "../entities/library";
+import type { UseCase } from "../common/UseCase";
+import type { BookRepository } from "./BookRepository";
+import type { Checklist } from "../entities/library";
 
 export interface ChecklistRequest {
   bookSlug?: string;

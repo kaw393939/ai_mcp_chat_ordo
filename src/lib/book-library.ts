@@ -9,7 +9,8 @@ import { PractitionerInteractor } from "../core/use-cases/PractitionerInteractor
 import { ChecklistInteractor } from "../core/use-cases/ChecklistInteractor";
 import { BookSummaryInteractor } from "../core/use-cases/BookSummaryInteractor";
 import { GetChapterInteractor } from "../core/use-cases/GetChapterInteractor";
-import { GetBookIndexInteractor, ChapterIndex } from "../core/use-cases/GetBookIndexInteractor";
+import type { ChapterIndex } from "../core/use-cases/GetBookIndexInteractor";
+import { GetBookIndexInteractor } from "../core/use-cases/GetBookIndexInteractor";
 
 import { ConsoleLogger } from "../adapters/ConsoleLogger";
 import { ErrorHandler } from "../core/services/ErrorHandler";

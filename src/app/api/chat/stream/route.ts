@@ -14,8 +14,11 @@ import type { ToolExecutionContext } from "@/core/tool-registry/ToolExecutionCon
 import { getSessionUser } from "@/lib/auth";
 import type { RoleName } from "@/core/entities/user";
 import type { MessagePart } from "@/core/entities/message-parts";
-import { getConversationInteractor } from "@/lib/chat/conversation-root";
+import { getConversationInteractor, getSummarizationInteractor } from "@/lib/chat/conversation-root";
 import { MessageLimitError } from "@/core/use-cases/ConversationInteractor";
+import { resolveUserId } from "@/lib/chat/resolve-user";
+import { buildContextWindow } from "@/lib/chat/context-window";
+import { buildSummaryContextBlock } from "@/lib/chat/summary-context";
 
 type ChatMessage = {
   role: "user" | "assistant";
@@ -35,12 +38,13 @@ export async function POST(request: NextRequest) {
       const apiKey = getAnthropicApiKey();
       const user = await getSessionUser();
       const role = user.roles[0] as RoleName;
-      const systemPrompt = await buildSystemPrompt(role);
+      const { userId } = await resolveUserId();
+      let systemPrompt = await buildSystemPrompt(role);
       const tools = getToolRegistry().getSchemasForRole(role) as Anthropic.Tool[];
 
       const execContext: ToolExecutionContext = {
         role,
-        userId: user.id,
+        userId,
       };
       const toolExecutor = (name: string, input: Record<string, unknown>) =>
         getToolExecutor()(name, input, execContext);
@@ -63,36 +67,43 @@ export async function POST(request: NextRequest) {
         return errorJson(context, "No user message found.", 400);
       }
 
-      // Persistence: only for authenticated (non-ANONYMOUS) users
-      const shouldPersist = role !== "ANONYMOUS";
+      // All users persist (anonymous via cookie ID, authenticated via user.id)
+      const interactor = getConversationInteractor();
       let conversationId = body.conversationId || null;
 
-      if (shouldPersist) {
-        const interactor = getConversationInteractor();
+      // Create conversation if needed
+      if (!conversationId) {
+        const title = latestUserMessage.slice(0, 80);
+        const conv = await interactor.create(userId, title);
+        conversationId = conv.id;
+      }
 
-        // Create conversation if needed
-        if (!conversationId) {
-          const title = latestUserMessage.slice(0, 80);
-          const conv = await interactor.create(user.id, title);
-          conversationId = conv.id;
+      // Persist user message
+      try {
+        await interactor.appendMessage(
+          {
+            conversationId,
+            role: "user",
+            content: latestUserMessage,
+            parts: [{ type: "text", text: latestUserMessage }],
+          },
+          userId,
+        );
+      } catch (err) {
+        if (err instanceof MessageLimitError) {
+          return errorJson(context, err.message, 400);
         }
+        throw err;
+      }
 
-        // Persist user message
-        try {
-          await interactor.appendMessage(
-            {
-              conversationId,
-              role: "user",
-              content: latestUserMessage,
-              parts: [{ type: "text", text: latestUserMessage }],
-            },
-            user.id,
-          );
-        } catch (err) {
-          if (err instanceof MessageLimitError) {
-            return errorJson(context, err.message, 400);
-          }
-          throw err;
+      // Build context window from persisted messages (handles summaries)
+      const allMessages = await interactor.getActiveForUser(userId);
+      let contextMessages: Array<{ role: "user" | "assistant"; content: string }> = incomingMessages;
+      if (allMessages) {
+        const ctx = buildContextWindow(allMessages.messages);
+        contextMessages = ctx.contextMessages;
+        if (ctx.summaryText) {
+          systemPrompt += buildSummaryContextBlock(ctx.summaryText);
         }
       }
 
@@ -119,8 +130,7 @@ export async function POST(request: NextRequest) {
         }
 
         // Persist math reply as assistant message
-        if (shouldPersist && conversationId && mathPayload.reply) {
-          const interactor = getConversationInteractor();
+        if (conversationId && mathPayload.reply) {
           await interactor.appendMessage(
             {
               conversationId,
@@ -128,7 +138,7 @@ export async function POST(request: NextRequest) {
               content: mathPayload.reply,
               parts: [{ type: "text", text: mathPayload.reply }],
             },
-            user.id,
+            userId,
           );
         }
 
@@ -144,8 +154,8 @@ export async function POST(request: NextRequest) {
       const stream = new ReadableStream<Uint8Array>({
         async start(controller) {
           try {
-            // Send conversationId as first SSE event for authenticated users
-            if (shouldPersist && conversationId) {
+            // Send conversationId as first SSE event
+            if (conversationId) {
               controller.enqueue(
                 encoder.encode(sseChunk({ conversation_id: conversationId })),
               );
@@ -153,7 +163,7 @@ export async function POST(request: NextRequest) {
 
             await runClaudeAgentLoopStream({
               apiKey,
-              messages: incomingMessages,
+              messages: contextMessages as Anthropic.MessageParam[],
               signal: streamAbortController.signal,
               systemPrompt,
               tools,
@@ -169,6 +179,10 @@ export async function POST(request: NextRequest) {
                   controller.enqueue(
                     encoder.encode(sseChunk({ tool_call: { name, args } })),
                   );
+                  // Record tool usage event
+                  if (conversationId) {
+                    interactor.recordToolUsed(conversationId, name, role).catch(() => {});
+                  }
                 },
                 onToolResult(name, result) {
                   assistantParts.push({ type: "tool_result", name, result });
@@ -180,9 +194,8 @@ export async function POST(request: NextRequest) {
             });
 
             // Persist assistant message after stream
-            if (shouldPersist && conversationId) {
+            if (conversationId) {
               try {
-                const interactor = getConversationInteractor();
                 await interactor.appendMessage(
                   {
                     conversationId,
@@ -190,11 +203,18 @@ export async function POST(request: NextRequest) {
                     content: assistantText,
                     parts: assistantParts,
                   },
-                  user.id,
+                  userId,
                 );
               } catch (err) {
                 console.error("[stream] persist assistant error", err);
               }
+            }
+
+            // Trigger summarization asynchronously (after stream completes)
+            if (conversationId) {
+              getSummarizationInteractor()
+                .summarizeIfNeeded(conversationId)
+                .catch((err) => console.error("[stream] summarization error", err));
             }
 
             controller.close();

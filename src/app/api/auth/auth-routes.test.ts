@@ -9,6 +9,14 @@ vi.mock("@/lib/db", () => ({
   getDb: () => testDb,
 }));
 
+const { repairConversationOwnershipIndex } = vi.hoisted(() => ({
+  repairConversationOwnershipIndex: vi.fn().mockResolvedValue(undefined),
+}));
+
+vi.mock("@/lib/chat/embed-conversation", () => ({
+  repairConversationOwnershipIndex,
+}));
+
 // Mock next/headers cookies
 let cookieJar: Map<string, string>;
 
@@ -18,7 +26,11 @@ vi.mock("next/headers", () => ({
       const val = cookieJar.get(name);
       return val ? { name, value: val } : undefined;
     },
-    set: (name: string, value: string) => {
+    set: (name: string, value: string, options?: { maxAge?: number }) => {
+      if (options?.maxAge === 0 || value === "") {
+        cookieJar.delete(name);
+        return;
+      }
       cookieJar.set(name, value);
     },
     delete: (name: string) => {
@@ -32,6 +44,7 @@ import { POST as registerRoute } from "@/app/api/auth/register/route";
 import { POST as loginRoute } from "@/app/api/auth/login/route";
 import { GET as meRoute } from "@/app/api/auth/me/route";
 import { POST as logoutRoute } from "@/app/api/auth/logout/route";
+import { getSessionUser } from "@/lib/auth";
 
 function jsonRequest(body: Record<string, unknown>): Request {
   return new Request("http://localhost:3000/api/auth/test", {
@@ -46,7 +59,22 @@ describe("Auth API routes — full lifecycle", () => {
     testDb = new Database(":memory:");
     ensureSchema(testDb);
     cookieJar = new Map();
+    repairConversationOwnershipIndex.mockClear();
   });
+
+  function seedAnonymousConversation(sessionId = "anon_seed") {
+    const anonUserId = `anon_${sessionId}`;
+    testDb
+      .prepare(`INSERT OR IGNORE INTO users (id, email, name) VALUES (?, ?, ?)`)
+      .run(anonUserId, `${anonUserId}@anonymous.local`, "Anonymous");
+    testDb
+      .prepare(`INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?, 'role_anonymous')`)
+      .run(anonUserId);
+    testDb
+      .prepare(`INSERT INTO conversations (id, user_id, title, status, session_source) VALUES (?, ?, ?, 'archived', 'anonymous_cookie')`)
+      .run("conv_anon", anonUserId, "Anonymous chat");
+    return anonUserId;
+  }
 
   it("register → login → me → logout → me(401)", async () => {
     // 1. Register
@@ -148,6 +176,96 @@ describe("Auth API routes — full lifecycle", () => {
       jsonRequest({ email: "nobody@test.com", password: "password123" }),
     );
     expect(res.status).toBe(401);
+
+    testDb.close();
+  });
+
+  it("repairs migrated anonymous conversation indexes during registration", async () => {
+    const anonSessionId = "anon_seed";
+    const anonUserId = seedAnonymousConversation(anonSessionId);
+    cookieJar.set("lms_anon_session", anonSessionId);
+
+    const res = await registerRoute(
+      jsonRequest({ email: "migrate@test.com", password: "password123", name: "Migrated User" }),
+    );
+    const body = await res.json();
+
+    expect(res.status).toBe(201);
+    expect(repairConversationOwnershipIndex).toHaveBeenCalledWith(
+      "conv_anon",
+      body.user.id,
+      anonUserId,
+    );
+    expect(cookieJar.has("lms_anon_session")).toBe(false);
+
+    testDb.close();
+  });
+
+  it("repairs migrated anonymous conversation indexes during login", async () => {
+    const regRes = await registerRoute(
+      jsonRequest({ email: "login-migrate@test.com", password: "password123", name: "Returning User" }),
+    );
+    const regBody = await regRes.json();
+
+    const anonSessionId = "anon_login_seed";
+    const anonUserId = seedAnonymousConversation(anonSessionId);
+    cookieJar.clear();
+    cookieJar.set("lms_anon_session", anonSessionId);
+
+    const res = await loginRoute(
+      jsonRequest({ email: "login-migrate@test.com", password: "password123" }),
+    );
+
+    expect(res.status).toBe(200);
+    expect(repairConversationOwnershipIndex).toHaveBeenCalledWith(
+      "conv_anon",
+      regBody.user.id,
+      anonUserId,
+    );
+    expect(cookieJar.has("lms_anon_session")).toBe(false);
+
+    testDb.close();
+  });
+
+  it("treats a mock-role cookie alone as anonymous", async () => {
+    cookieJar.set("lms_mock_session_role", "ADMIN");
+
+    const user = await getSessionUser();
+
+    expect(user.roles).toEqual(["ANONYMOUS"]);
+    expect(cookieJar.has("lms_mock_session_role")).toBe(false);
+
+    testDb.close();
+  });
+
+  it("keeps role simulation as an overlay on a validated real session", async () => {
+    const regRes = await registerRoute(
+      jsonRequest({ email: "overlay@test.com", password: "password123", name: "Overlay User" }),
+    );
+    const regBody = await regRes.json();
+    cookieJar.set("lms_mock_session_role", "ADMIN");
+
+    const user = await getSessionUser();
+
+    expect(user.id).toBe(regBody.user.id);
+    expect(user.roles).toEqual(["ADMIN"]);
+
+    testDb.close();
+  });
+
+  it("clears stale session and mock cookies when session validation fails", async () => {
+    await registerRoute(
+      jsonRequest({ email: "stale@test.com", password: "password123", name: "Stale User" }),
+    );
+
+    cookieJar.set("lms_session_token", "invalid-session-token");
+    cookieJar.set("lms_mock_session_role", "ADMIN");
+
+    const user = await getSessionUser();
+
+    expect(user.roles).toEqual(["ANONYMOUS"]);
+    expect(cookieJar.has("lms_session_token")).toBe(false);
+    expect(cookieJar.has("lms_mock_session_role")).toBe(false);
 
     testDb.close();
   });

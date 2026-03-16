@@ -25,22 +25,39 @@
 
   /* Layout Tokens */
   --container-width: 72rem;
-  --container-padding: 1.5rem;
+  --content-width: 48rem;
+  --narrow-width: 24rem;
+  --viewport-block-size: 100vh;
+  --viewport-inline-size: 100vw;
+  --safe-area-inset-top: env(safe-area-inset-top, 0px);
+  --safe-area-inset-right: env(safe-area-inset-right, 0px);
+  --safe-area-inset-bottom: env(safe-area-inset-bottom, 0px);
+  --safe-area-inset-left: env(safe-area-inset-left, 0px);
 
-  /* Accessibility — these will be controlled via buttons now */
+  /* Accessibility */
   --font-size-base: 1rem;
   --line-height-base: 1.6;
   --letter-spacing-base: 0;
 
-  /* Density Tokens */
+  /* Density Tokens (single source — overridden by [data-density]) */
   --spacing-unit: 1rem;
   --message-gap: 1.5rem;
   --container-padding: 1.5rem;
   --input-padding: 1rem;
+  --safe-area-padding-top: max(var(--spacing-unit), var(--safe-area-inset-top));
+  --safe-area-padding-right: max(var(--container-padding), var(--safe-area-inset-right));
+  --safe-area-padding-bottom: max(var(--spacing-unit), var(--safe-area-inset-bottom));
+  --safe-area-padding-left: max(var(--container-padding), var(--safe-area-inset-left));
 
   /* Status Colors (color-blind overridable) */
   --status-success: oklch(0.6 0.18 155);
   --status-error: oklch(0.6 0.22 25);
+}
+
+@supports (height: 100dvh) {
+  :root {
+    --viewport-block-size: 100dvh;
+  }
 }
 
 [data-density="compact"] {
@@ -83,30 +100,17 @@
 
 /* Accessibility Focus Ring Utility */
 @utility focus-ring {
-  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--accent-color)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--background)];
+  @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent focus-visible:ring-offset-2 focus-visible:ring-offset-background;
 }
 
 /* ── Reusable Component Utilities ─────────────────────────── */
 
 /* Label text — small uppercase tracking used for section headers/tags */
 @utility text-label {
-  font-size: 10px;
+  font-size: 0.6875rem;
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.1em;
-}
-
-/* Accent background + foreground pair */
-@utility accent-fill {
-  background-color: var(--accent-color);
-  color: var(--accent-foreground);
-}
-
-/* Interactive hover surface */
-@utility hover-surface {
-  &:hover {
-    background-color: var(--surface-hover);
-  }
 }
 
 /* Code block chrome — replaces hardcoded zinc colors */
@@ -120,19 +124,104 @@
   color: oklch(0.65 0.01 250);
 }
 
-/* Themed border — semantic border with design-system color */
-@utility border-theme {
-  @apply border border-[var(--border-color)];
+/* Interactive hover surface */
+@utility hover-surface {
+  &:hover {
+    background-color: var(--surface-hover);
+  }
+}
+
+/* Small icon button — ghost pill with opacity hover */
+@utility rounded-theme {
+  border-radius: var(--border-radius);
+}
+
+@utility icon-btn {
+  @apply p-2 rounded-theme hover-surface opacity-50 hover:opacity-100 transition-all active:scale-90;
+}
+
+/* ── DRY Component Patterns ────────────────────────────────── */
+
+/* Container — centered, capped width, padded */
+@utility site-container {
+  margin-inline: auto;
+  max-width: var(--container-width);
+  padding-inline: var(--container-padding);
+}
+
+/* Theme-aware input field */
+@utility input-field {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  border-radius: var(--border-radius);
+  font-size: 0.875rem;
+  background-color: var(--surface-muted);
+  border-width: var(--border-width);
+  border-color: var(--border-color);
+  transition: box-shadow 0.2s;
+  &:focus {
+    outline: none;
+    box-shadow: 0 0 0 2px var(--accent-color);
+  }
+}
+
+/* Primary action button */
+@utility btn-primary {
+  width: 100%;
+  padding: 0.625rem 1rem;
+  border-radius: var(--border-radius);
+  font-size: 0.75rem;
+  font-weight: 700;
+  background-color: var(--foreground);
+  color: var(--background);
+  transition: opacity 0.2s;
+  &:hover { opacity: 0.9; }
+  &:disabled { opacity: 0.5; }
+}
+
+/* Alert/error banner */
+@utility alert-error {
+  padding: 0.75rem 1rem;
+  border-radius: var(--border-radius);
+  font-size: 0.75rem;
+  font-weight: 600;
+  background-color: oklch(0.6 0.22 25 / 0.1);
+  color: oklch(0.6 0.22 25);
+  border: 1px solid oklch(0.6 0.22 25 / 0.2);
+}
+
+/* Field error text */
+@utility field-error {
+  font-size: 0.6875rem;
+  font-weight: 600;
+  color: oklch(0.6 0.22 25);
+  margin-inline-start: 0.25rem;
+}
+
+/* Form label */
+@utility form-label {
+  font-size: 0.6875rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+  opacity: 0.6;
+  margin-inline-start: 0.25rem;
+}
+
+/* Accent background + foreground pair */
+@utility accent-fill {
+  background-color: var(--accent-color);
+  color: var(--accent-foreground);
 }
 
 /* Library/accent link — rich underlined link with hover glow */
 @utility link-accent {
-  @apply text-[var(--accent-color)] font-bold decoration-[var(--accent-color)]/30 underline decoration-2 underline-offset-4 hover:decoration-[var(--accent-color)] transition-all px-1 rounded hover:bg-[var(--accent-color)]/5;
+  @apply text-accent font-bold decoration-accent/30 underline decoration-2 underline-offset-4 hover:decoration-accent transition-all px-1 rounded-theme hover:bg-accent/5;
 }
 
-/* Small icon button — ghost pill with opacity hover */
-@utility icon-btn {
-  @apply p-2 rounded-xl hover-surface opacity-50 hover:opacity-100 transition-all active:scale-90;
+/* Shadow bloom — elevated floating panel glow */
+@utility shadow-bloom {
+  box-shadow: var(--shadow-sm);
 }
 
 @theme inline {
@@ -145,6 +234,8 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-text: var(--text);
+  --color-status-success: var(--status-success);
+  --color-status-error: var(--status-error);
   --font-sans: var(--font-base);
   --font-mono: var(--font-geist-mono);
 }
@@ -329,10 +420,13 @@ html,
 body {
   block-size: 100%;
   inline-size: 100%;
+  min-block-size: 100%;
   margin: 0;
   padding: 0;
+  overflow-x: hidden;
+  overflow-y: auto;
   overflow-inline: hidden;
-  overflow-block: auto; /* Restore natural scroll for footer accessibility */
+  overflow-block: auto;
 }
 
 html {
@@ -343,26 +437,20 @@ body {
   font-family: var(--font-base, sans-serif);
   line-height: var(--line-height-base);
   letter-spacing: var(--letter-spacing-base);
-  display: flex;
-  flex-direction: column;
-}
-
-/* Force all themed containers to inherit properly */
-[class*="theme-"] * {
-  border-color: var(--border-color);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 /* =========================================================
-   Custom Utility Classes
+   Custom Utility Classes — single source of truth
    ========================================================= */
 
 @layer utilities {
-  .rounded-theme {
-    border-radius: var(--border-radius);
-  }
-
+  /* border-theme: applies BOTH theme width AND theme color */
   .border-theme {
     border-width: var(--border-width);
+    border-color: var(--border-color);
   }
 
   .border-color-theme {
@@ -373,33 +461,66 @@ body {
     box-shadow: var(--shadow-sm);
   }
 
-  .bg-surface {
+  .viewport-shell {
+    block-size: var(--viewport-block-size);
+    min-block-size: var(--viewport-block-size);
+    overflow-x: hidden;
+    overflow-y: auto;
+  }
+
+  .safe-area-pt {
+    padding-top: var(--safe-area-padding-top);
+  }
+
+  .safe-area-pr {
+    padding-right: var(--safe-area-padding-right);
+  }
+
+  .safe-area-pb {
+    padding-bottom: var(--safe-area-padding-bottom);
+  }
+
+  .safe-area-pl {
+    padding-left: var(--safe-area-padding-left);
+  }
+
+  .safe-area-px {
+    padding-left: var(--safe-area-padding-left);
+    padding-right: var(--safe-area-padding-right);
+  }
+
+  .safe-area-py {
+    padding-top: var(--safe-area-padding-top);
+    padding-bottom: var(--safe-area-padding-bottom);
+  }
+
+  .glass-surface {
     background-color: var(--surface);
+    background-color: color-mix(in oklab, var(--surface) 92%, transparent);
+    box-shadow:
+      0 18px 48px rgb(15 23 42 / 0.12),
+      inset 0 1px 0 rgb(255 255 255 / 0.14);
   }
 
-  .bg-surface-hover {
-    background-color: var(--surface-hover);
+  .glass-overlay {
+    background-color: rgb(15 23 42 / 0.52);
   }
 
-  .bg-surface-muted {
-    background-color: var(--surface-muted);
-  }
+  @supports ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+    .glass-surface {
+      background-color: color-mix(in oklab, var(--surface) 78%, transparent);
+      backdrop-filter: blur(24px) saturate(140%);
+      -webkit-backdrop-filter: blur(24px) saturate(140%);
+      box-shadow:
+        0 24px 64px rgb(15 23 42 / 0.18),
+        inset 0 1px 0 rgb(255 255 255 / 0.18);
+    }
 
-  .bg-accent-theme {
-    background-color: var(--accent-color);
-    color: var(--accent-foreground);
-  }
-
-  .text-accent-theme {
-    color: var(--accent-color);
-  }
-
-  .border-accent-theme {
-    border-color: var(--accent-color);
-  }
-
-  .shadow-bloom {
-    box-shadow: var(--shadow-sm);
+    .glass-overlay {
+      background-color: rgb(15 23 42 / 0.36);
+      backdrop-filter: blur(8px) saturate(120%);
+      -webkit-backdrop-filter: blur(8px) saturate(120%);
+    }
   }
 
   /* Sprint 4: Brand & Narrative */
@@ -411,13 +532,6 @@ body {
     0%, 100% { opacity: 0.8; transform: scale(1); }
     50% { opacity: 1; transform: scale(1.05); filter: drop-shadow(0 0 8px var(--accent-color)); }
   }
-
-  /* Typographic Precision */
-  * {
-    -webkit-font-smoothing: antialiased;
-    -moz-osx-font-smoothing: grayscale;
-    text-rendering: optimizeLegibility;
-  }
 }
 /* Sprint 3: Physics & Haptics */
 @utility spring-bounce {
@@ -426,4 +540,50 @@ body {
 
 @utility haptic-press {
   @apply active:scale-[0.97] active:shadow-inner transition-all duration-200 spring-bounce;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html,
+  html:focus-within,
+  .scroll-smooth {
+    scroll-behavior: auto !important;
+  }
+
+  .brand-pulse,
+  .animate-pulse,
+  .animate-bounce,
+  .animate-spin {
+    animation: none !important;
+  }
+
+  .brand-pulse {
+    filter: none !important;
+    opacity: 1;
+    transform: none !important;
+  }
+
+  .animate-in,
+  [class*="slide-in-from-"],
+  [class*="zoom-in-"],
+  [class*="fade-in"] {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+
+  [class*="hover:scale-"],
+  [class*="active:scale-"],
+  [class*="hover:-translate-y-"] {
+    transform: none !important;
+  }
+
+  .spring-bounce {
+    transition-timing-function: ease-out;
+  }
+
+  .haptic-press,
+  [class*="transition-all"],
+  [class*="transition-transform"] {
+    transition-duration: 120ms !important;
+  }
 }

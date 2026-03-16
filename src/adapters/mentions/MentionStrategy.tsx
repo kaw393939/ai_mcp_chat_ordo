@@ -1,4 +1,4 @@
-import { MentionItem } from "../../core/entities/mentions";
+import type { MentionItem } from "../../core/entities/mentions";
 
 /**
  * Strategy Interface for Mention Rendering and Interaction
@@ -15,7 +15,7 @@ export class PractitionerMentionStrategy implements MentionStrategy {
   renderDescription(item: MentionItem) {
     return (
       <span className="flex items-center gap-1">
-        <span className="opacity-100 font-bold text-accent-theme">Practitioner</span>
+        <span className="opacity-100 font-bold text-accent">Practitioner</span>
         {item.description && <span className="opacity-60">• {item.description}</span>}
       </span>
     );

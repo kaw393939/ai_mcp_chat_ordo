@@ -11,6 +11,7 @@ import { QueryProcessor } from "@/core/search/QueryProcessor";
 import { LowercaseStep } from "@/core/search/query-steps/LowercaseStep";
 import { InMemoryBM25IndexStore } from "@/adapters/InMemoryBM25IndexStore";
 import type { Embedder } from "@/core/search/ports/Embedder";
+import type { VectorStore, EmbeddingRecord } from "@/core/search/ports/VectorStore";
 import type { BookRepository } from "@/core/use-cases/BookRepository";
 import type { Book } from "@/core/entities/library";
 import { Chapter } from "@/core/entities/library";
@@ -46,6 +47,42 @@ function makeMockEmbedder(ready: boolean): Embedder {
   };
 }
 
+function makeVectorRecord(id: string, content: string): EmbeddingRecord {
+  return {
+    id,
+    sourceType: "book_chunk",
+    sourceId: "book-1",
+    chunkIndex: 0,
+    chunkLevel: "passage",
+    heading: null,
+    content,
+    embeddingInput: content,
+    contentHash: "hash",
+    modelVersion: "test",
+    embedding: new Float32Array(384),
+    metadata: {
+      sourceType: "book_chunk",
+      bookTitle: "Book One",
+      bookSlug: "book-1",
+      chapterTitle: "Ch",
+      chapterSlug: "ch-1",
+      chapterFirstSentence: content,
+    },
+  };
+}
+
+function makeVectorStore(records: EmbeddingRecord[]): VectorStore {
+  return {
+    upsert: vi.fn(),
+    delete: vi.fn(),
+    getAll: vi.fn(() => records),
+    getBySourceId: vi.fn(() => records),
+    getContentHash: vi.fn(() => null),
+    getModelVersion: vi.fn(() => null),
+    count: vi.fn(() => records.length),
+  };
+}
+
 describe("SearchHandlerChain", () => {
   // TEST-VS-26
   it("embeddings table empty → BM25-only results via fallback", async () => {
@@ -60,12 +97,9 @@ describe("SearchHandlerChain", () => {
     const engine = {} as HybridSearchEngine; // won't be called
     const bm25Processor = new QueryProcessor([new LowercaseStep()]);
 
-    const vectorStore = {
-      getAll: () => [{
-        id: "doc1", content: "The Bauhaus movement was important.", heading: null,
-        chunkIndex: 0, metadata: { bookTitle: "Book One", bookNumber: "1", bookSlug: "book-1", chapterTitle: "Ch", chapterSlug: "ch-1" },
-      }],
-    };
+    const vectorStore = makeVectorStore([
+      makeVectorRecord("doc1", "The Bauhaus movement was important."),
+    ]);
 
     const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore);
     const bm25 = new BM25SearchHandler(new BM25Scorer(), bm25IndexStore, vectorStore, bm25Processor);
@@ -94,12 +128,9 @@ describe("SearchHandlerChain", () => {
     const engine = {} as HybridSearchEngine;
     const bm25Processor = new QueryProcessor([new LowercaseStep()]);
 
-    const vectorStore = {
-      getAll: () => [{
-        id: "doc1", content: "The Bauhaus movement was important.", heading: null,
-        chunkIndex: 0, metadata: { bookTitle: "Book One", bookNumber: "1", bookSlug: "book-1", chapterTitle: "Ch", chapterSlug: "ch-1" },
-      }],
-    };
+    const vectorStore = makeVectorStore([
+      makeVectorRecord("doc1", "The Bauhaus movement was important."),
+    ]);
 
     const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore);
     const bm25 = new BM25SearchHandler(new BM25Scorer(), bm25IndexStore, vectorStore, bm25Processor);
@@ -120,7 +151,7 @@ describe("SearchHandlerChain", () => {
     const embedder = makeMockEmbedder(false);
     const engine = {} as HybridSearchEngine;
     const bm25Processor = new QueryProcessor([new LowercaseStep()]);
-    const vectorStore = { getAll: () => [] };
+    const vectorStore = makeVectorStore([]);
 
     const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore);
     const bm25 = new BM25SearchHandler(new BM25Scorer(), bm25IndexStore, vectorStore, bm25Processor);
@@ -150,12 +181,9 @@ describe("SearchHandlerChain", () => {
     const engine = {} as HybridSearchEngine;
     const bm25Processor = new QueryProcessor([new LowercaseStep()]);
 
-    const vectorStore = {
-      getAll: () => [{
-        id: "doc1", content: "Test content for testing.", heading: null,
-        chunkIndex: 0, metadata: { bookTitle: "B", bookNumber: "1", bookSlug: "b-1", chapterTitle: "C", chapterSlug: "c-1" },
-      }],
-    };
+    const vectorStore = makeVectorStore([
+      makeVectorRecord("doc1", "Test content for testing."),
+    ]);
 
     const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore);
     const bm25 = new BM25SearchHandler(new BM25Scorer(), bm25IndexStore, vectorStore, bm25Processor);
@@ -177,7 +205,7 @@ describe("SearchHandlerChain", () => {
     const embedder = makeMockEmbedder(false);
     const engine = {} as HybridSearchEngine;
     const bm25Processor = new QueryProcessor([new LowercaseStep()]);
-    const vectorStore = { getAll: () => [] };
+    const vectorStore = makeVectorStore([]);
 
     const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore);
     const bm25 = new BM25SearchHandler(new BM25Scorer(), bm25IndexStore, vectorStore, bm25Processor);

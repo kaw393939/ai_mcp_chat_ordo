@@ -44,12 +44,24 @@ import {
   librarianRemoveBook,
   librarianRemoveChapter,
 } from "./librarian-tool";
+import type { PromptToolDeps } from "./prompt-tool";
+import {
+  promptList,
+  promptGet,
+  promptSet,
+  promptRollback,
+  promptDiff,
+} from "./prompt-tool";
+import { SystemPromptDataMapper } from "@/adapters/SystemPromptDataMapper";
+import { ConversationEventDataMapper } from "@/adapters/ConversationEventDataMapper";
+import { ConversationEventRecorder } from "@/core/use-cases/ConversationEventRecorder";
 
 const MODEL_VERSION = "all-MiniLM-L6-v2@1.0";
 
 interface AllDeps {
   embedding: EmbeddingToolDeps;
   librarian: LibrarianToolDeps;
+  prompt: PromptToolDeps;
 }
 
 function buildDeps(): AllDeps {
@@ -116,6 +128,27 @@ function buildDeps(): AllDeps {
       clearCaches: () => {
         cached.clearCache();
         fsRepo.clearDiscoveryCache();
+      },
+    },
+    prompt: {
+      promptRepo: new SystemPromptDataMapper(db),
+      eventRecorder: new ConversationEventRecorder(new ConversationEventDataMapper(db)),
+      findActiveConversationIds: async (role: string): Promise<string[]> => {
+        if (role === "ALL") {
+          const rows = db.prepare(`SELECT id FROM conversations WHERE status = 'active'`).all() as { id: string }[];
+          return rows.map((r) => r.id);
+        }
+        if (role === "ANONYMOUS") {
+          const rows = db.prepare(`SELECT id FROM conversations WHERE status = 'active' AND user_id LIKE 'anon_%'`).all() as { id: string }[];
+          return rows.map((r) => r.id);
+        }
+        const rows = db.prepare(
+          `SELECT c.id FROM conversations c
+           JOIN user_roles ur ON c.user_id = ur.user_id
+           JOIN roles r ON ur.role_id = r.id
+           WHERE c.status = 'active' AND r.name = ?`
+        ).all(role) as { id: string }[];
+        return rows.map((r) => r.id);
       },
     },
   };
@@ -368,6 +401,77 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         additionalProperties: false,
       },
     },
+    // --- Prompt management tools ---
+    {
+      name: "prompt_list",
+      description: "List all system prompt versions, optionally filtered by role and/or prompt_type.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          role: { type: "string", description: "Filter by role (e.g. 'ALL', 'ANONYMOUS', 'ADMIN')." },
+          prompt_type: { type: "string", description: "Filter by type ('base' or 'role_directive')." },
+        },
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "prompt_get",
+      description: "Get a specific system prompt. Returns the active version by default, or a specific version if provided.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          role: { type: "string", description: "Prompt role." },
+          prompt_type: { type: "string", description: "Prompt type ('base' or 'role_directive')." },
+          version: { type: "number", description: "Specific version number (omit for active)." },
+        },
+        required: ["role", "prompt_type"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "prompt_set",
+      description: "Create a new prompt version and immediately activate it. The previous active version is retained.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          role: { type: "string", description: "Prompt role." },
+          prompt_type: { type: "string", description: "Prompt type ('base' or 'role_directive')." },
+          content: { type: "string", description: "Full prompt text." },
+          notes: { type: "string", description: "Explanation of why this change was made." },
+        },
+        required: ["role", "prompt_type", "content", "notes"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "prompt_rollback",
+      description: "Reactivate a previous prompt version.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          role: { type: "string", description: "Prompt role." },
+          prompt_type: { type: "string", description: "Prompt type ('base' or 'role_directive')." },
+          version: { type: "number", description: "Version number to reactivate." },
+        },
+        required: ["role", "prompt_type", "version"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "prompt_diff",
+      description: "Line-by-line diff between two prompt versions.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          role: { type: "string", description: "Prompt role." },
+          prompt_type: { type: "string", description: "Prompt type ('base' or 'role_directive')." },
+          version_a: { type: "number", description: "First version to compare." },
+          version_b: { type: "number", description: "Second version to compare." },
+        },
+        required: ["role", "prompt_type", "version_a", "version_b"],
+        additionalProperties: false,
+      },
+    },
   ],
 }));
 
@@ -447,6 +551,22 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         d.librarian,
         a as { book_slug: string; chapter_slug: string },
       );
+      break;
+    // --- Prompt management tools ---
+    case "prompt_list":
+      result = await promptList(d.prompt, a as { role?: string; prompt_type?: string });
+      break;
+    case "prompt_get":
+      result = await promptGet(d.prompt, a as { role: string; prompt_type: string; version?: number });
+      break;
+    case "prompt_set":
+      result = await promptSet(d.prompt, a as { role: string; prompt_type: string; content: string; notes: string });
+      break;
+    case "prompt_rollback":
+      result = await promptRollback(d.prompt, a as { role: string; prompt_type: string; version: number });
+      break;
+    case "prompt_diff":
+      result = await promptDiff(d.prompt, a as { role: string; prompt_type: string; version_a: number; version_b: number });
       break;
     default:
       throw new Error(`Unknown tool: ${name}`);

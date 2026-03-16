@@ -57,7 +57,15 @@ export function logEvent(
   });
 }
 
-export function getErrorCode(message: string) {
+export function getErrorCode(message: string, status?: number) {
+  if (status === 404) {
+    return "NOT_FOUND";
+  }
+
+  if (status === 401 || status === 403) {
+    return "AUTH_ERROR";
+  }
+
   if (
     message === "messages must be a non-empty array." ||
     message === "No user message found."

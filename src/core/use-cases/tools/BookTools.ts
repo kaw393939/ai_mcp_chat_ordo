@@ -1,4 +1,4 @@
-import { ToolCommand } from "../ToolCommand";
+import type { ToolCommand } from "../ToolCommand";
 import type { BookRepository } from "../BookRepository";
 import type { ToolExecutionContext } from "@/core/tool-registry/ToolExecutionContext";
 import type { SearchHandler } from "@/core/search/ports/SearchHandler";

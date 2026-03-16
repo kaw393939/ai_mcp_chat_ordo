@@ -31,7 +31,7 @@ export default async function BookLayout({
   })) : [];
 
   return (
-    <div className="flex min-h-screen bg-[var(--background)] font-sans text-[var(--foreground)] transition-colors duration-300">
+    <div className="flex flex-1 overflow-hidden bg-background font-sans text-foreground transition-colors duration-300">
       <div className="hidden md:flex">
         <BookSidebar 
           book={{
@@ -43,12 +43,12 @@ export default async function BookLayout({
         />
       </div>
 
-      <main className="flex-1 overflow-x-hidden p-6 lg:p-12 pb-24">
-        <div className="md:hidden flex justify-between items-center mb-8 pb-4 border-b border-[var(--border-color)]">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden p-[var(--container-padding)] lg:p-12 pb-24">
+        <div className="md:hidden flex justify-between items-center mb-8 pb-4 border-b border-color-theme">
           <div className="flex gap-4 items-center">
             <Link
               href="/books"
-              className="text-label tracking-[0.2em] text-[var(--accent-color)]"
+              className="text-label tracking-[0.2em] text-accent"
             >
               ← Books
             </Link>

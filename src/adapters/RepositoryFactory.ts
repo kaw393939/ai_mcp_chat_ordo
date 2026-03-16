@@ -1,4 +1,4 @@
-import { BookRepository } from "../core/use-cases/BookRepository";
+import type { BookRepository } from "../core/use-cases/BookRepository";
 import { FileSystemBookRepository } from "./FileSystemBookRepository";
 import { CachedBookRepository } from "./CachedBookRepository";
 

@@ -37,6 +37,8 @@ docs/_specs/
 | [Librarian](librarian/) | **Draft** | 2 (0–1) | `_corpus/` auto-discovery, MCP librarian tools, zip import |
 | [Web Search](web-search/) | **Complete** | 1 (0) | Admin web search via OpenAI GPT-5, rich UI, citations |
 | [Conversation Memory](conversation-memory/) | **Draft** | 3 (0–2) | Anonymous persistence, auto-resume, rolling summaries, conversation search |
+| [Browser UI Hardening](browser-ui-hardening/) | **Draft** | 7 (0–6) | Cross-browser shell, overlay, motion, media, and regression hardening for Safari, Chrome, Firefox, and mobile browsers |
+| [Homepage Chat Shell](homepage-chat-shell/) | **Draft** | 4 (0–3) | Homepage-first chat stage architecture with below-the-fold footer, exclusive message scrolling, and pinned composer behavior |
 
 ### Roadmap
 
@@ -61,6 +63,13 @@ Historical planning documents: [archive/](archive/)
 
 Every feature flows through four phases. Each phase produces a specific
 artifact. **Do not skip phases or combine them.**
+
+This process exists to control predictable LLM failure modes:
+
+- hallucination about files, signatures, or architecture
+- drift away from the real scope
+- context loss during long sessions
+- false confidence from incomplete verification
 
 ### Phase 1 — Spec (`spec.md`)
 
@@ -136,7 +145,7 @@ A sprint doc must include:
 ### Phase 3 — Implementation
 
 **Input:** A sprint doc.
-**Output:** Working code, passing tests, clean build.
+**Output:** Working code, passing tests, documented verification.
 
 The implementing agent follows the sprint doc task by task:
 
@@ -151,8 +160,8 @@ The implementing agent follows the sprint doc task by task:
    npx vitest run             # full test suite — ALL must pass
    npm run build              # production build — must be clean
    ```
-6. **Stage, commit, and push.** Use a descriptive commit message with the
-   sprint number and a summary of what was built.
+6. **Record the result in docs.** Update the sprint checklist, QA Deviations,
+   and any feature-owned artifacts needed to preserve the real state.
 
 **Implementation rules:**
 
@@ -163,10 +172,12 @@ The implementing agent follows the sprint doc task by task:
 - Do not add dependencies unless the sprint doc explicitly calls for them.
 - All new code must type-check. All new tests must pass. The full suite must
   remain green. The build must be clean.
+- For UI work, do not stop at structural assertions if the live runtime still
+   disagrees with the spec.
 
 ### Phase 4 — QA
 
-**Input:** Completed implementation (committed code).
+**Input:** Completed implementation.
 **Output:** QA report — either "PASS (0 issues)" or a list of fixes applied.
 
 QA is a **separate pass** performed after implementation, ideally by a fresh
@@ -197,8 +208,8 @@ agent context. The QA agent:
 6. **Produces a QA report** with a pass/fail verdict, a table of checks, and
    any issues found with fixes applied.
 
-7. **If issues are found:** fix them, run verification again, commit with a
-   message like `fix: Sprint N QA — {description of fixes}`.
+7. **If issues are found:** fix them, run verification again, and update the
+   sprint doc or feature artifacts so the documented state matches reality.
 
 ---
 
@@ -220,11 +231,11 @@ code.
    - Confirm the exports/methods listed are real.
 5. Check that the sprint doc's code snippets are consistent with each other
    (e.g., a type defined in one snippet is used correctly in another).
-6. If issues are found, fix the sprint doc, commit, and note the fixes.
+6. If issues are found, fix the sprint doc and note the fixes.
 
 ---
 
-## 5. Commit Conventions
+## 5. Checkpoint Conventions
 
 | Type | When |
 |------|------|
@@ -238,9 +249,28 @@ Commit messages should include:
 - How many tests were added
 - The verification result (e.g., "307 tests / 59 files all passing, build clean")
 
+Use these as human git checkpoints when the course workflow or repository
+owner wants commits. They are not a substitute for spec updates, sprint-doc QA,
+or deterministic verification.
+
 ---
 
-## 6. Architecture Principles
+## 6. LLM Risk Controls
+
+These controls are mandatory if you want the process to survive real agentic
+work.
+
+| Failure Mode | What It Looks Like | Control |
+| --- | --- | --- |
+| Hallucination | invented APIs, fake imports, imaginary files | read the code first; verify every referenced asset |
+| Drift | the sprint quietly grows beyond the original problem | keep one spec per feature and one bounded sprint at a time |
+| Context loss | constraints disappear during long sessions | keep artifacts ordered; update docs as soon as the state changes |
+| False confidence | tests pass but the feature is still broken for users | run QA and live verification where the interaction matters |
+| Documentation rot | repo docs no longer describe the real system | update spec, sprint docs, and artifacts during closeout |
+
+---
+
+## 7. Architecture Principles
 
 These principles govern all specs and implementations in this project:
 
@@ -277,19 +307,20 @@ These principles govern all specs and implementations in this project:
 
 ---
 
-## 7. Quick Reference: Running the Process
+## 8. Quick Reference: Running the Process
 
 ### Starting a new feature
 
 ```
 1. Discuss requirements with the user
-2. Write spec.md → commit
-3. QA spec against codebase → fix issues → commit
-4. Write sprint-0 doc → commit
-5. QA sprint-0 doc against spec + codebase → fix issues → commit
-6. Implement sprint-0 → commit
-7. QA sprint-0 implementation → fix issues → commit
+2. Write or update spec.md
+3. QA spec against codebase and fix issues
+4. Write sprint-0 doc
+5. QA sprint-0 doc against spec + codebase and fix issues
+6. Implement sprint-0
+7. QA sprint-0 implementation and fix issues
 8. Repeat steps 4–7 for each subsequent sprint
+9. Checkpoint in git when the workflow or repo owner calls for it
 ```
 
 ### Picking up an existing feature
@@ -316,14 +347,14 @@ These principles govern all specs and implementations in this project:
 
 ---
 
-## 8. What NOT To Do
+## 9. What NOT To Do
 
 - **Don't guess API signatures.** Read the actual source file.
 - **Don't skip the QA phase.** Every sprint gets QA'd after implementation.
 - **Don't add scope.** If it's not in the sprint doc, it doesn't get built.
 - **Don't refactor adjacent code.** A sprint touches only what the doc says.
 - **Don't skip verification steps.** Every task has a verify command. Run it.
-- **Don't commit with failing tests.** The full suite must be green.
+- **Don't claim success from tests alone** when the live runtime still disagrees.
+- **Don't checkpoint broken work.** The full suite and required QA must be green.
 - **Don't hardcode** where convention-based discovery is possible.
-- **Don't create new markdown docs** summarizing work unless the user asks.
-  The sprint doc + commit message + QA report are the record.
+- **Don't leave the state only in chat history.** The sprint doc, artifacts, and QA notes are the record.

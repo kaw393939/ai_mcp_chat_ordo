@@ -78,7 +78,7 @@ export default function RegisterPage() {
   }
 
   return (
-    <div className="flex-1 flex items-center justify-center p-6">
+    <div className="flex-1 flex items-center justify-center p-[var(--container-padding)]">
       <div className="w-full max-w-sm space-y-6">
         <div className="text-center space-y-2">
           <h1 className="text-2xl font-bold tracking-tight">Create Account</h1>
@@ -89,13 +89,13 @@ export default function RegisterPage() {
 
         <form onSubmit={handleSubmit} className="space-y-4">
           {generalError && (
-            <div className="px-4 py-3 rounded-xl text-xs font-semibold bg-red-500/10 text-red-500 border border-red-500/20">
+            <div className="alert-error">
               {generalError}
             </div>
           )}
 
           <div className="space-y-1.5">
-            <label htmlFor="name" className="text-[11px] font-bold uppercase tracking-widest opacity-60 ml-1">
+            <label htmlFor="name" className="form-label">
               Name
             </label>
             <input
@@ -104,17 +104,17 @@ export default function RegisterPage() {
               required
               value={name}
               onChange={(e) => { setName(e.target.value); setFieldErrors((p) => ({ ...p, name: undefined })); }}
-              className={`w-full px-4 py-2.5 rounded-xl text-sm bg-[var(--surface-muted)] border-theme focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] transition-shadow ${fieldErrors.name ? "ring-2 ring-red-500/50" : ""}`}
+              className={`input-field ${fieldErrors.name ? "ring-2 ring-red-500/50" : ""}`}
               placeholder="Your name"
               autoComplete="name"
             />
             {fieldErrors.name && (
-              <p className="text-[10px] font-semibold text-red-500 ml-1">{fieldErrors.name}</p>
+              <p className="field-error">{fieldErrors.name}</p>
             )}
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="email" className="text-[11px] font-bold uppercase tracking-widest opacity-60 ml-1">
+            <label htmlFor="email" className="form-label">
               Email
             </label>
             <input
@@ -123,17 +123,17 @@ export default function RegisterPage() {
               required
               value={email}
               onChange={(e) => { setEmail(e.target.value); setFieldErrors((p) => ({ ...p, email: undefined })); }}
-              className={`w-full px-4 py-2.5 rounded-xl text-sm bg-[var(--surface-muted)] border-theme focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] transition-shadow ${fieldErrors.email ? "ring-2 ring-red-500/50" : ""}`}
+              className={`input-field ${fieldErrors.email ? "ring-2 ring-red-500/50" : ""}`}
               placeholder="you@example.com"
               autoComplete="email"
             />
             {fieldErrors.email && (
-              <p className="text-[10px] font-semibold text-red-500 ml-1">{fieldErrors.email}</p>
+              <p className="field-error">{fieldErrors.email}</p>
             )}
           </div>
 
           <div className="space-y-1.5">
-            <label htmlFor="password" className="text-[11px] font-bold uppercase tracking-widest opacity-60 ml-1">
+            <label htmlFor="password" className="form-label">
               Password
             </label>
             <input
@@ -142,19 +142,19 @@ export default function RegisterPage() {
               required
               value={password}
               onChange={(e) => { setPassword(e.target.value); setFieldErrors((p) => ({ ...p, password: undefined })); }}
-              className={`w-full px-4 py-2.5 rounded-xl text-sm bg-[var(--surface-muted)] border-theme focus:outline-none focus:ring-2 focus:ring-[var(--accent-color)] transition-shadow ${fieldErrors.password ? "ring-2 ring-red-500/50" : ""}`}
+              className={`input-field ${fieldErrors.password ? "ring-2 ring-red-500/50" : ""}`}
               placeholder="8+ characters"
               autoComplete="new-password"
             />
             {fieldErrors.password && (
-              <p className="text-[10px] font-semibold text-red-500 ml-1">{fieldErrors.password}</p>
+              <p className="field-error">{fieldErrors.password}</p>
             )}
           </div>
 
           <button
             type="submit"
             disabled={loading}
-            className="w-full py-2.5 rounded-xl text-xs font-bold bg-[var(--foreground)] text-[var(--background)] hover:opacity-90 transition-opacity disabled:opacity-50"
+            className="btn-primary"
           >
             {loading ? "Creating account…" : "Create Account"}
           </button>
@@ -162,7 +162,7 @@ export default function RegisterPage() {
 
         <p className="text-center text-xs opacity-50">
           Already have an account?{" "}
-          <Link href="/login" className="font-bold opacity-100 text-[var(--accent-color)] hover:underline">
+          <Link href="/login" className="font-bold opacity-100 text-accent hover:underline">
             Sign In
           </Link>
         </p>

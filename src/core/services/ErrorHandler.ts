@@ -8,20 +8,20 @@ export enum ErrorSeverity {
 export interface AppError extends Error {
   code: string;
   severity: ErrorSeverity;
-  context?: Record<string, any>;
+  context?: Record<string, unknown>;
 }
 
 export interface Logger {
-  info(message: string, context?: Record<string, any>): void;
-  warn(message: string, context?: Record<string, any>): void;
-  error(message: string, context?: Record<string, any>): void;
-  debug(message: string, context?: Record<string, any>): void;
+  info(message: string, context?: Record<string, unknown>): void;
+  warn(message: string, context?: Record<string, unknown>): void;
+  error(message: string, context?: Record<string, unknown>): void;
+  debug(message: string, context?: Record<string, unknown>): void;
 }
 
 export class ErrorHandler {
   constructor(private logger: Logger) {}
 
-  handle(error: unknown, context?: Record<string, any>): void {
+  handle(error: unknown, context?: Record<string, unknown>): void {
     if (this.isAppError(error)) {
       this.logger.error(`[${error.code}] ${error.message}`, {
         ...context,
@@ -35,7 +35,14 @@ export class ErrorHandler {
     }
   }
 
-  private isAppError(error: any): error is AppError {
-    return error && typeof error.code === "string" && typeof error.severity === "string";
+  private isAppError(error: unknown): error is AppError {
+    return (
+      typeof error === "object" &&
+      error !== null &&
+      "code" in error &&
+      typeof error.code === "string" &&
+      "severity" in error &&
+      typeof error.severity === "string"
+    );
   }
 }

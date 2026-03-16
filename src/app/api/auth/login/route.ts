@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { login } from "@/lib/auth";
 import { InvalidCredentialsError } from "@/core/use-cases/AuthenticateUserInteractor";
+import { migrateAnonymousConversationsToUser } from "@/lib/chat/migrate-anonymous-conversations";
 
 export async function POST(req: Request) {
   try {
@@ -26,6 +27,8 @@ export async function POST(req: Request) {
       secure: process.env.NODE_ENV === "production",
       maxAge: 7 * 24 * 60 * 60, // 7 days
     });
+
+    await migrateAnonymousConversationsToUser(result.user.id, "login");
 
     return NextResponse.json({ user: result.user });
   } catch (error) {

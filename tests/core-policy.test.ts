@@ -1,11 +1,29 @@
 import { describe, expect, it } from "vitest";
 import { ChatPolicyInteractor } from "@/core/use-cases/ChatPolicyInteractor";
+import { DefaultingSystemPromptRepository } from "@/core/use-cases/DefaultingSystemPromptRepository";
 import { getToolRegistry } from "@/lib/chat/tool-composition-root";
 import { createAdminWebSearchTool } from "@/core/use-cases/tools/admin-web-search.tool";
+import type { SystemPromptRepository } from "@/core/use-cases/SystemPromptRepository";
+
+// Minimal in-memory stub that always returns null (forces fallback)
+const nullRepo: SystemPromptRepository = {
+  getActive: async () => null,
+  listVersions: async () => [],
+  getByVersion: async () => null,
+  createVersion: async () => { throw new Error("not implemented"); },
+  activate: async () => {},
+};
 
 describe("ChatPolicyInteractor", () => {
   const basePrompt = "You are an advisor.";
-  const interactor = new ChatPolicyInteractor(basePrompt);
+  const directives: Record<string, string> = {
+    ANONYMOUS: "\nDEMO MODE",
+    AUTHENTICATED: "\nregistered member",
+    STAFF: "\nstaff member",
+    ADMIN: "\nSYSTEM ADMINISTRATOR",
+  };
+  const repo = new DefaultingSystemPromptRepository(nullRepo, basePrompt, directives);
+  const interactor = new ChatPolicyInteractor(repo);
 
   it("ANONYMOUS prompt includes DEMO mode framing", async () => {
     const prompt = await interactor.execute({ role: "ANONYMOUS" });
@@ -53,19 +71,19 @@ describe("ToolRegistry RBAC", () => {
     expect(registry.canExecute("list_practitioners", "ANONYMOUS")).toBe(false);
   });
 
-  it("AUTHENTICATED gets all 11 tool schemas", () => {
+  it("AUTHENTICATED gets all 12 tool schemas", () => {
     const schemas = registry.getSchemasForRole("AUTHENTICATED");
-    expect(schemas).toHaveLength(11);
-  });
-
-  it("STAFF gets all 11 tool schemas", () => {
-    const schemas = registry.getSchemasForRole("STAFF");
-    expect(schemas).toHaveLength(11);
-  });
-
-  it("ADMIN gets 12 tool schemas (11 base + admin_web_search)", () => {
-    const schemas = registry.getSchemasForRole("ADMIN");
     expect(schemas).toHaveLength(12);
+  });
+
+  it("STAFF gets all 12 tool schemas", () => {
+    const schemas = registry.getSchemasForRole("STAFF");
+    expect(schemas).toHaveLength(12);
+  });
+
+  it("ADMIN gets 13 tool schemas (12 base + admin_web_search)", () => {
+    const schemas = registry.getSchemasForRole("ADMIN");
+    expect(schemas).toHaveLength(13);
     const names = schemas.map((s) => s.name);
     expect(names).toContain("admin_web_search");
   });

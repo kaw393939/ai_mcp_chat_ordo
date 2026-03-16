@@ -1,4 +1,4 @@
-import React, { useMemo } from "react";
+import React from "react";
 import { CodeBlock } from "./CodeBlock";
 import type {
   RichContent,
@@ -15,7 +15,7 @@ const MermaidRenderer = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-[160px] w-full flex items-center justify-center text-xs opacity-50 animate-pulse bg-[var(--surface-muted)] rounded-xl border-theme my-2">
+      <div className="h-[160px] w-full flex items-center justify-center text-xs opacity-50 animate-pulse bg-surface-muted rounded-theme border-theme my-2">
         Loading Diagram Engine...
       </div>
     ),
@@ -27,7 +27,7 @@ const AudioPlayer = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-[72px] w-full max-w-sm flex items-center justify-center text-xs opacity-50 animate-pulse bg-[var(--surface-muted)] rounded-xl border-theme my-2">
+      <div className="h-[72px] w-full max-w-sm flex items-center justify-center text-xs opacity-50 animate-pulse bg-surface-muted rounded-theme border-theme my-2">
         Loading Audio Engine...
       </div>
     ),
@@ -42,7 +42,7 @@ const WebSearchResultCard = dynamic(
   {
     ssr: false,
     loading: () => (
-      <div className="h-[72px] w-full max-w-2xl flex items-center justify-center text-xs opacity-50 animate-pulse bg-[var(--surface-muted)] rounded-xl border-theme my-2">
+      <div className="h-[72px] w-full max-w-2xl flex items-center justify-center text-xs opacity-50 animate-pulse bg-surface-muted rounded-theme border-theme my-2">
         Loading Web Search...
       </div>
     ),
@@ -99,12 +99,12 @@ const blockRegistry: { [K in BlockNode["type"]]: React.FC<BlockProps<Extract<Blo
     );
   },
   blockquote: ({ block, onLinkClick }) => (
-    <blockquote className="my-3 pl-4 border-l-4 border-[var(--border-color)] opacity-75 italic text-sm leading-relaxed">
+    <blockquote className="my-3 pl-4 border-l-4 border-border opacity-75 italic text-sm leading-relaxed">
       <InlineRenderer nodes={block.content} onLinkClick={onLinkClick} />
     </blockquote>
   ),
   list: ({ block, onLinkClick }) => (
-    <ul className="mb-4 ml-6 space-y-2 list-disc marker:text-[var(--accent-color)]">
+    <ul className="mb-4 ml-6 space-y-2 list-disc marker:text-accent">
       {block.items.map((item, i) => (
         <li key={i} className="leading-relaxed pl-1">
           <InlineRenderer nodes={item} onLinkClick={onLinkClick} />
@@ -112,7 +112,7 @@ const blockRegistry: { [K in BlockNode["type"]]: React.FC<BlockProps<Extract<Blo
       ))}
     </ul>
   ),
-  divider: () => <hr className="my-4 border-[var(--border-color)]" />,
+  divider: () => <hr className="my-4 border-border" />,
   "code-block": ({ block }) => {
     if (block.language === "mermaid") {
       return <MermaidRenderer code={block.code} />;
@@ -128,7 +128,11 @@ const blockRegistry: { [K in BlockNode["type"]]: React.FC<BlockProps<Extract<Blo
   ),
   audio: ({ block }) => (
     <div className="my-2 max-w-sm">
-      <AudioPlayer text={block.text} title={block.title} />
+      <AudioPlayer
+        text={block.text}
+        title={block.title}
+        assetId={block.assetId}
+      />
     </div>
   ),
   "web-search": ({ block }) => (
@@ -155,7 +159,7 @@ const inlineRegistry: { [K in InlineNode["type"]]: React.FC<InlineProps<Extract<
   text: ({ node }) => <>{node.text}</>,
   bold: ({ node }) => <strong>{node.text}</strong>,
   "code-inline": ({ node }) => (
-    <code className="bg-[var(--surface-muted)] text-[var(--foreground)] px-1.5 py-0.5 rounded-md text-[0.85em] font-mono border-theme">
+    <code className="bg-surface-muted text-foreground px-1.5 py-0.5 rounded-md text-[0.85em] font-mono border-theme">
       {node.text}
     </code>
   ),
@@ -190,7 +194,7 @@ const TableRenderer: React.FC<{
   onLinkClick?: (slug: string) => void;
 }> = ({ header, rows, onLinkClick }) => {
   return (
-    <div className="my-4 w-full overflow-x-auto border-theme rounded-[var(--border-radius)]">
+    <div className="my-4 w-full overflow-x-auto border-theme rounded-theme">
       <table className="w-full text-sm border-collapse">
         {header && (
           <thead>
@@ -212,14 +216,14 @@ const TableRenderer: React.FC<{
               key={ri}
               className={
                 ri % 2 === 0
-                  ? "bg-[var(--surface)] hover-surface transition-colors"
-                  : "bg-[var(--surface-muted)] hover-surface transition-colors"
+                  ? "bg-surface hover-surface transition-colors"
+                  : "bg-surface-muted hover-surface transition-colors"
               }
             >
               {row.map((cell, ci) => (
                 <td
                   key={ci}
-                  className="px-5 py-3.5 align-top leading-relaxed border-b border-[var(--border-color)]"
+                  className="px-5 py-3.5 align-top leading-relaxed border-b border-border"
                 >
                   <InlineRenderer nodes={cell} onLinkClick={onLinkClick} />
                 </td>

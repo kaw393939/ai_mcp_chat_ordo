@@ -299,16 +299,15 @@ describe("EmbeddingPipelineFactory", () => {
     expect(pipeline).toBeInstanceOf(EmbeddingPipeline);
   });
 
-  it("throws for conversation source type", () => {
+  it("creates pipeline for conversation source type", () => {
     const factory = new EmbeddingPipelineFactory(
       new MockEmbedder(),
       new InMemoryVectorStore(),
       MODEL_VERSION,
     );
 
-    expect(() => factory.createForSource("conversation")).toThrow(
-      "ConversationChunker not yet implemented",
-    );
+    const pipeline = factory.createForSource("conversation");
+    expect(pipeline).toBeDefined();
   });
 
   // TEST-VS-25: On-demand indexDocument() embeds a single chapter end-to-end

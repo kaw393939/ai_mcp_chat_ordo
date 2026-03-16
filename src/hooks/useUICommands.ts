@@ -39,7 +39,7 @@ function applyUIAdjustment(
   setTheme: (t: Theme) => void,
   setIsDark: (d: boolean) => void,
 ) {
-  let acc = { ...current };
+  const acc = { ...current };
 
   // If a preset is specified, apply its values first
   if (settings.preset && typeof settings.preset === "string" && settings.preset in UI_PRESETS) {

@@ -11,7 +11,7 @@ export function CodeBlock({ code, lang }: { code: string; lang?: string }) {
     setTimeout(() => setCopied(false), UI_CONSTANTS.COPY_TIMEOUT_MS);
   }
   return (
-    <div className="my-4 rounded-xl overflow-hidden border-theme text-sm">
+    <div className="my-4 rounded-theme overflow-hidden border-theme text-sm">
       <div className="flex items-center justify-between code-chrome px-4 py-2">
         <span className="text-label font-mono opacity-70">
           {lang || "code"}

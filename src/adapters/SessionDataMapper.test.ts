@@ -3,6 +3,14 @@ import { SessionDataMapper } from "./SessionDataMapper";
 import Database from "better-sqlite3";
 import { ensureSchema } from "../lib/db/schema";
 
+function requireValue<T>(value: T | null | undefined): T {
+  expect(value).toBeTruthy();
+  if (value == null) {
+    throw new Error("Expected value to be present.");
+  }
+  return value;
+}
+
 function createDb() {
   const db = new Database(":memory:");
   ensureSchema(db);
@@ -23,10 +31,9 @@ describe("SessionDataMapper", () => {
 
     await mapper.create(session);
 
-    const found = await mapper.findByToken("tok_123");
-    expect(found).not.toBeNull();
-    expect(found!.id).toBe("tok_123");
-    expect(found!.userId).toBe("usr_admin");
+    const found = requireValue(await mapper.findByToken("tok_123"));
+    expect(found.id).toBe("tok_123");
+    expect(found.userId).toBe("usr_admin");
 
     await mapper.delete("tok_123");
 

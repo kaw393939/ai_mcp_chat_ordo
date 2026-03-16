@@ -1,6 +1,6 @@
-import { UseCase } from "../common/UseCase";
-import { BookRepository } from "./BookRepository";
-import { Practitioner } from "../entities/library";
+import type { UseCase } from "../common/UseCase";
+import type { BookRepository } from "./BookRepository";
+import type { Book, Practitioner } from "../entities/library";
 
 export interface PractitionerRequest {
   query?: string;
@@ -13,7 +13,7 @@ export class PractitionerInteractor implements UseCase<PractitionerRequest, Prac
     const chapters = await this.bookRepository.getAllChapters();
     const books = await this.bookRepository.getAllBooks();
     
-    const practitionerMap = new Map<string, { books: Set<string>; chapters: Set<string>; bookData: any[] }>();
+    const practitionerMap = new Map<string, { books: Set<string>; chapters: Set<string>; bookData: Book[] }>();
 
     for (const chapter of chapters) {
       for (const name of chapter.practitioners) {
@@ -26,10 +26,10 @@ export class PractitionerInteractor implements UseCase<PractitionerRequest, Prac
           practitionerMap.set(key, record);
         }
         
-        const book = books.find(b => b.slug === chapter.bookSlug);
+        const book = books.find((candidate) => candidate.slug === chapter.bookSlug);
         if (book) {
           record.books.add(book.slug);
-          if (!record.bookData.find(b => b.slug === book.slug)) {
+          if (!record.bookData.find((candidate) => candidate.slug === book.slug)) {
             record.bookData.push(book);
           }
         }
@@ -42,7 +42,7 @@ export class PractitionerInteractor implements UseCase<PractitionerRequest, Prac
       .map(([key, value]) => ({
         name: key.charAt(0).toUpperCase() + key.slice(1),
         books: value.bookData,
-        chapters: Array.from(value.chapters).map(s => JSON.parse(s)),
+        chapters: Array.from(value.chapters).map((chapter) => JSON.parse(chapter) as Practitioner["chapters"][number]),
       }))
       .sort((a, b) => b.chapters.length - a.chapters.length);
   }

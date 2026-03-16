@@ -1,4 +1,4 @@
-import { StreamEvent } from "../entities/chat-stream";
+import type { StreamEvent } from "../entities/chat-stream";
 
 /**
  * Core Interface for AI Streaming

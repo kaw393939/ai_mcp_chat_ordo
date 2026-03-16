@@ -103,9 +103,9 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           {pendingFiles.map((file, i) => (
             <div
               key={i}
-              className="flex items-center gap-2 px-3 py-1.5 bg-[var(--surface)] border-theme rounded-lg text-xs font-medium"
+              className="flex items-center gap-2 px-3 py-1.5 bg-surface border-theme rounded-lg text-xs font-medium"
             >
-              <span className="truncate max-w-[120px]">{file.name}</span>
+              <span className="max-w-30 truncate">{file.name}</span>
               <button
                 onClick={() => onFileRemove(i)}
                 className="hover:text-red-500 p-0.5"
@@ -123,7 +123,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           e.preventDefault();
           onSend();
         }}
-        className="relative flex items-center gap-1.5 bg-[var(--surface)] border-theme rounded-full transition-all duration-500 focus-within:border-[var(--accent-color)] focus-within:ring-2 focus-within:ring-[var(--accent-color)]/10 shadow-sm hover:shadow-md"
+        className="relative flex items-center gap-2 bg-surface border-theme rounded-[28px] transition-all duration-500 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/10 shadow-sm hover:shadow-md"
         style={{ padding: 'var(--input-padding)' }}
       >
         {activeTrigger && suggestions.length > 0 && (
@@ -144,7 +144,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="shrink-0 p-2 rounded-full hover-surface text-[var(--foreground)]/70 hover:text-[var(--accent-color)] transition-all active:scale-95"
+          className="focus-ring min-h-11 min-w-11 shrink-0 rounded-full p-2 text-foreground/70 transition-all hover:text-accent hover-surface active:scale-95"
           aria-label="Attach file"
         >
           <svg
@@ -161,13 +161,13 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           onChange={(e) => onChange(e.target.value, e.target.selectionStart ?? 0)}
           onKeyDown={handleKeyDown}
           placeholder="Ask anything…"
-          className="flex-1 min-w-0 bg-transparent px-2 sm:px-3 py-1.5 text-[13px] sm:text-sm leading-tight outline-none placeholder:text-[var(--foreground)]/50 font-normal text-[var(--foreground)]"
+          className="flex-1 min-w-0 bg-transparent px-2 py-2 text-[13px] leading-tight outline-none placeholder:text-foreground/50 font-normal text-foreground sm:px-3 sm:text-sm"
         />
 
         <button
           type="submit"
           disabled={!canSend && pendingFiles.length === 0}
-          className="shrink-0 rounded-full accent-fill px-4 sm:px-5 py-1.5 text-[11px] font-bold uppercase tracking-[0.15em] disabled:bg-[var(--surface-muted)] disabled:text-[var(--foreground)]/40 disabled:shadow-none flex items-center gap-2 shadow-sm hover:shadow-md transition-all duration-200 hover:scale-[1.02] active:scale-95 outline-none"
+          className="focus-ring flex min-h-11 shrink-0 items-center gap-2 rounded-full accent-fill px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md active:scale-95 disabled:bg-surface-muted disabled:text-foreground/40 disabled:shadow-none sm:px-5"
         >
           {isSending ? (
             <span className="flex gap-1">

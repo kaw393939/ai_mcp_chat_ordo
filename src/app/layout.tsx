@@ -30,7 +30,7 @@ const spaceMono = Space_Mono({
 
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { GridInspector } from "@/components/GridInspector";
-import { SiteNav } from "@/components/SiteNav";
+import { AppShell } from "@/components/AppShell";
 import CommandPalette from "@/components/CommandPalette";
 import { GlobalChat } from "@/components/GlobalChat";
 import { getSessionUser } from "@/lib/auth";
@@ -42,8 +42,6 @@ export const metadata: Metadata = {
 
 import { ChatProvider } from "@/hooks/useGlobalChat";
 import { Suspense } from "react";
-
-import { SiteFooter } from "@/components/SiteFooter";
 
 export default async function RootLayout({
   children,
@@ -59,22 +57,7 @@ export default async function RootLayout({
       >
         <ThemeProvider>
           <ChatProvider>
-            <div className="min-h-screen flex flex-col bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300">
-              {/* STAGE: Nav + Main (Locked to 100vh to push footer below fold) */}
-              <div className="h-[100dvh] flex flex-col flex-none overflow-hidden relative">
-                <div className="flex-none">
-                  <SiteNav user={user} />
-                </div>
-                <main className="flex-1 flex flex-col relative overflow-hidden min-h-0">
-                  {children}
-                </main>
-              </div>
-              
-              {/* FOOTER: Naturally below the fold */}
-              <div className="flex-none">
-                <SiteFooter />
-              </div>
-            </div>
+            <AppShell user={user}>{children}</AppShell>
             <Suspense fallback={null}>
               <GlobalChat />
             </Suspense>

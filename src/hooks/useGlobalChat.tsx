@@ -1,11 +1,11 @@
 "use client";
 
-import React, { createContext, useContext, useReducer, useState, useMemo, useCallback, useEffect, ReactNode } from "react";
+import { createContext, useContext, useReducer, useState, useMemo, useCallback, useEffect } from "react";
+import type { ReactNode } from "react";
 export type { MessagePart } from "@/core/entities/message-parts";
 import type { MessagePart } from "@/core/entities/message-parts";
 export type { ChatMessage } from "@/core/entities/chat-message";
 import type { ChatMessage } from "@/core/entities/chat-message";
-import type { ConversationSummary } from "@/core/entities/conversation";
 
 import { 
   StreamProcessor, 
@@ -104,15 +104,11 @@ interface ChatContextType {
   isSending: boolean;
   canSend: boolean;
   conversationId: string | null;
-  conversations: ConversationSummary[];
-  isLoadingConversations: boolean;
   isLoadingMessages: boolean;
   setInput: (val: string) => void;
   sendMessage: (eventOrMessage?: { preventDefault: () => void } | string) => Promise<void>;
-  loadConversation: (id: string) => Promise<void>;
   newConversation: () => void;
-  deleteConversation: (id: string) => Promise<void>;
-  refreshConversations: () => Promise<ConversationSummary[]>;
+  archiveConversation: () => Promise<void>;
 }
 
 const ChatContext = createContext<ChatContextType | undefined>(undefined);
@@ -136,35 +132,12 @@ export function ChatProvider({ children }: { children: ReactNode }) {
   const [input, setInput] = useState("");
   const [isSending, setIsSending] = useState(false);
   const [conversationId, setConversationId] = useState<string | null>(null);
-  const [conversations, setConversations] = useState<ConversationSummary[]>([]);
-  const [isLoadingConversations, setIsLoadingConversations] = useState(false);
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
 
   const canSend = useMemo(
     () => input.trim().length > 0 && !isSending,
     [input, isSending],
   );
-
-  const refreshConversations = useCallback(async (): Promise<ConversationSummary[]> => {
-    setIsLoadingConversations(true);
-    try {
-      const res = await fetch("/api/conversations");
-      // 401 is expected for anonymous users — just skip loading
-      if (res.status === 401) return [];
-      if (res.ok) {
-        const data = await res.json() as { conversations: ConversationSummary[] };
-        setConversations(data.conversations);
-        return data.conversations;
-      }
-    } catch {
-      // Silent fail — conversations list is non-critical
-    } finally {
-      setIsLoadingConversations(false);
-    }
-    return [];
-  }, []);
-
-  // Load conversations on mount + auto-resume is below (after loadConversation)
 
   const newConversation = useCallback(() => {
     setConversationId(null);
@@ -179,68 +152,61 @@ export function ChatProvider({ children }: { children: ReactNode }) {
     });
   }, []);
 
-  const loadConversation = useCallback(async (id: string) => {
-    setIsLoadingMessages(true);
-    try {
-      const res = await fetch(`/api/conversations/${encodeURIComponent(id)}`);
-      if (res.status === 401) {
-        window.location.href = "/login";
-        return;
-      }
-      if (!res.ok) return;
-      const data = await res.json() as {
-        conversation: { id: string };
-        messages: Array<{
-          id: string;
-          role: "user" | "assistant";
-          content: string;
-          parts: MessagePart[];
-          createdAt: string;
-        }>;
-      };
-
-      const loaded: ChatMessage[] = data.messages.map((m) => ({
-        id: m.id,
-        role: m.role,
-        content: m.content,
-        parts: m.parts,
-        timestamp: new Date(m.createdAt),
-      }));
-
-      setConversationId(data.conversation.id);
-      dispatch({ type: "REPLACE_ALL", messages: loaded });
-    } catch {
-      // Silent fail
-    } finally {
-      setIsLoadingMessages(false);
-    }
-  }, []);
-
-  // Load conversations on mount + auto-resume most recent
+  // Load active conversation on mount (single-conversation model)
   useEffect(() => {
-    refreshConversations().then((convos) => {
-      if (convos && convos.length > 0) {
-        loadConversation(convos[0].id);
+    const loadActive = async () => {
+      setIsLoadingMessages(true);
+      try {
+        const res = await fetch("/api/conversations/active");
+        if (res.status === 404) {
+          return;
+        }
+        if (res.status === 401) {
+          console.warn("Active conversation restore unexpectedly required authentication.");
+          return;
+        }
+        if (!res.ok) {
+          console.error(`Failed to restore active conversation: ${res.status}`);
+          return;
+        }
+        const data = await res.json() as {
+          conversation: { id: string };
+          messages: Array<{
+            id: string;
+            role: "user" | "assistant";
+            content: string;
+            parts: MessagePart[];
+            createdAt: string;
+          }>;
+        };
+        const loaded: ChatMessage[] = data.messages.map((m) => ({
+          id: m.id,
+          role: m.role,
+          content: m.content,
+          parts: m.parts,
+          timestamp: new Date(m.createdAt),
+        }));
+        setConversationId(data.conversation.id);
+        dispatch({ type: "REPLACE_ALL", messages: loaded });
+      } catch {
+        // network error → default hero message
+      } finally {
+        setIsLoadingMessages(false);
       }
-    });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    };
+    loadActive();
   }, []);
 
-  const deleteConversation = useCallback(async (id: string) => {
+  const archiveConversation = useCallback(async () => {
     try {
-      const res = await fetch(`/api/conversations/${encodeURIComponent(id)}`, { method: "DELETE" });
-      if (res.status === 401) {
-        window.location.href = "/login";
-        return;
-      }
-      setConversations((prev) => prev.filter((c) => c.id !== id));
-      if (conversationId === id) {
+      const res = await fetch("/api/conversations/active/archive", { method: "POST" });
+      if (res.ok) {
         newConversation();
       }
     } catch {
       // Silent fail
     }
-  }, [conversationId, newConversation]);
+  }, [newConversation]);
 
   // Listen for SET_CONVERSATION_ID actions from the stream processor
   const dispatchWithConversationId = useCallback(
@@ -293,9 +259,6 @@ export function ChatProvider({ children }: { children: ReactNode }) {
       for await (const event of stream.events()) {
         streamProcessor.process(event, { dispatch: dispatchWithConversationId, assistantIndex });
       }
-
-      // Refresh conversation list after sending
-      refreshConversations();
     } catch (error) {
       dispatch({
         type: "SET_ERROR",
@@ -309,9 +272,9 @@ export function ChatProvider({ children }: { children: ReactNode }) {
 
   return (
     <ChatContext.Provider value={{
-      messages, input, isSending, canSend, conversationId, conversations,
-      isLoadingConversations, isLoadingMessages,
-      setInput, sendMessage, loadConversation, newConversation, deleteConversation, refreshConversations
+      messages, input, isSending, canSend, conversationId,
+      isLoadingMessages,
+      setInput, sendMessage, newConversation, archiveConversation
     }}>
       {children}
     </ChatContext.Provider>

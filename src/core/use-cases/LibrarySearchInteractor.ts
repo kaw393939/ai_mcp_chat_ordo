@@ -1,6 +1,6 @@
-import { UseCase } from "../common/UseCase";
-import { BookQuery, ChapterQuery } from "./BookRepository";
-import { LibrarySearchResult } from "../entities/library";
+import type { UseCase } from "../common/UseCase";
+import type { BookQuery, ChapterQuery } from "./BookRepository";
+import type { LibrarySearchResult } from "../entities/library";
 import type { SearchHandler } from "../search/ports/SearchHandler";
 
 export interface SearchRequest {

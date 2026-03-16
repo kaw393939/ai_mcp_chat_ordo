@@ -1,4 +1,4 @@
-import { ToolCommand } from "../ToolCommand";
+import type { ToolCommand } from "../ToolCommand";
 import type { ToolExecutionContext } from "@/core/tool-registry/ToolExecutionContext";
 
 export class SetThemeCommand implements ToolCommand<{ theme: string }, string> {

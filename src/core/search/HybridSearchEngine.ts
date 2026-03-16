@@ -2,8 +2,8 @@ import type { Embedder } from "./ports/Embedder";
 import type { VectorStore, EmbeddingRecord, VectorQuery } from "./ports/VectorStore";
 import type { BM25IndexStore } from "./ports/BM25IndexStore";
 import type { HybridSearchResult } from "./types";
-import { BM25Scorer } from "./BM25Scorer";
-import { QueryProcessor } from "./QueryProcessor";
+import type { BM25Scorer } from "./BM25Scorer";
+import type { QueryProcessor } from "./QueryProcessor";
 import { dotSimilarity } from "./dotSimilarity";
 import { l2Normalize } from "./l2Normalize";
 import { reciprocalRankFusion } from "./ReciprocalRankFusion";
@@ -85,7 +85,11 @@ export class HybridSearchEngine {
     const merged = [...rrfScores.entries()]
       .sort((a, b) => b[1] - a[1])
       .map(([id, score], rank) => {
-        const record = recordMap.get(id)!;
+        const record = recordMap.get(id);
+        if (!record) {
+          return null;
+        }
+
         const meta = record.metadata as {
           bookTitle?: string;
           bookNumber?: string;
@@ -112,7 +116,8 @@ export class HybridSearchEngine {
             end: record.chunkIndex * 400 + record.content.length,
           },
         } satisfies HybridSearchResult;
-      });
+      })
+      .filter((result): result is HybridSearchResult => result !== null);
 
     // 7. Deduplication
     const deduped = deduplicateByChapter(merged);

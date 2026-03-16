@@ -25,6 +25,7 @@ describe("LibrarySearchInteractor", () => {
     getAllChapters: vi.fn().mockResolvedValue(mockChapters),
     getChaptersByBook: vi.fn(),
     getChapter: vi.fn(),
+    getBook: vi.fn(),
   };
 
   it("should find results with exact phrase match", async () => {

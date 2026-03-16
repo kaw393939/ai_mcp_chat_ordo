@@ -26,17 +26,23 @@ export class CachedBookRepository implements BookRepository {
   }
 
   async getBook(slug: string): Promise<Book | null> {
-    if (!this.bookCache.has(slug)) {
-      this.bookCache.set(slug, await this.inner.getBook(slug));
+    if (this.bookCache.has(slug)) {
+      return this.bookCache.get(slug) ?? null;
     }
-    return this.bookCache.get(slug)!;
+
+    const book = await this.inner.getBook(slug);
+    this.bookCache.set(slug, book);
+    return book;
   }
 
   async getChaptersByBook(bookSlug: string): Promise<Chapter[]> {
-    if (!this.chaptersByBookCache.has(bookSlug)) {
-      this.chaptersByBookCache.set(bookSlug, await this.inner.getChaptersByBook(bookSlug));
+    if (this.chaptersByBookCache.has(bookSlug)) {
+      return this.chaptersByBookCache.get(bookSlug) ?? [];
     }
-    return this.chaptersByBookCache.get(bookSlug)!;
+
+    const chapters = await this.inner.getChaptersByBook(bookSlug);
+    this.chaptersByBookCache.set(bookSlug, chapters);
+    return chapters;
   }
 
   async getAllChapters(): Promise<Chapter[]> {
@@ -48,9 +54,15 @@ export class CachedBookRepository implements BookRepository {
 
   async getChapter(bookSlug: string, chapterSlug: string): Promise<Chapter> {
     const key = `${bookSlug}/${chapterSlug}`;
-    if (!this.chapterCache.has(key)) {
-      this.chapterCache.set(key, await this.inner.getChapter(bookSlug, chapterSlug));
+    if (this.chapterCache.has(key)) {
+      const cached = this.chapterCache.get(key);
+      if (cached) {
+        return cached;
+      }
     }
-    return this.chapterCache.get(key)!;
+
+    const chapter = await this.inner.getChapter(bookSlug, chapterSlug);
+    this.chapterCache.set(key, chapter);
+    return chapter;
   }
 }

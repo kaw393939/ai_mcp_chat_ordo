@@ -1,5 +1,12 @@
 import { useEffect, useRef, useState, useCallback, type RefObject } from "react";
 
+import {
+  getAutoScrollBehavior,
+  getUserScrollBehavior,
+  scheduleAfterPaint,
+  scrollElementTo,
+} from "@/lib/ui/browserSupport";
+
 export function useChatScroll<T>(dep: T): {
   scrollRef: RefObject<HTMLDivElement | null>;
   isAtBottom: boolean;
@@ -38,12 +45,9 @@ export function useChatScroll<T>(dep: T): {
     setIsAtBottom(atBottom);
   }, [checkIfAtBottom]);
 
-  const scrollToBottom = useCallback((behavior: ScrollBehavior = "smooth") => {
+  const scrollToBottom = useCallback((behavior: ScrollBehavior = getUserScrollBehavior()) => {
     if (scrollRef.current) {
-      scrollRef.current.scrollTo({
-        top: scrollRef.current.scrollHeight,
-        behavior,
-      });
+      scrollElementTo(scrollRef.current, scrollRef.current.scrollHeight, behavior);
       userScrolledUp.current = false;
       setIsAtBottom(true);
     }
@@ -53,17 +57,16 @@ export function useChatScroll<T>(dep: T): {
   useEffect(() => {
     if (userScrolledUp.current) return;
 
-    // requestAnimationFrame ensures the DOM has painted the new content
-    const raf = requestAnimationFrame(() => {
+    const cleanup = scheduleAfterPaint(() => {
       if (scrollRef.current) {
-        // Use instant scroll during streaming to avoid stutter from queued smooth scrolls
-        scrollRef.current.scrollTo({
-          top: scrollRef.current.scrollHeight,
-          behavior: "instant",
-        });
+        scrollElementTo(
+          scrollRef.current,
+          scrollRef.current.scrollHeight,
+          getAutoScrollBehavior(),
+        );
       }
     });
-    return () => cancelAnimationFrame(raf);
+    return cleanup;
   }, [dep]);
 
   return { scrollRef, isAtBottom, scrollToBottom, handleScroll };

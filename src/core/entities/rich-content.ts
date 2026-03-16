@@ -31,7 +31,7 @@ export type BlockNode =
   | { type: typeof BLOCK_TYPES.CODE; code: string; language?: string }
   | { type: typeof BLOCK_TYPES.TABLE; header?: InlineNode[][]; rows: InlineNode[][][] }
   | { type: typeof BLOCK_TYPES.DIVIDER }
-  | { type: typeof BLOCK_TYPES.AUDIO; text: string; title: string }
+  | { type: typeof BLOCK_TYPES.AUDIO; text: string; title: string; assetId?: string }
   | { type: typeof BLOCK_TYPES.WEB_SEARCH; query: string; allowed_domains?: string[]; model?: string };
 
 export interface RichContent {

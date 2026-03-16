@@ -84,6 +84,44 @@ export function ensureSchema(db: Database.Database): void {
     CREATE INDEX IF NOT EXISTS idx_msg_conv ON messages(conversation_id);
   `);
 
+  // Sprint 0: Add status column to conversations (CONVO-050)
+  try {
+    db.exec(`ALTER TABLE conversations ADD COLUMN status TEXT NOT NULL DEFAULT 'active'`);
+  } catch {
+    // Column already exists
+  }
+  db.exec(`CREATE INDEX IF NOT EXISTS idx_conv_user_status ON conversations(user_id, status)`);
+
+  // Sprint 0: Metadata columns on conversations (CONVO-070)
+  try { db.exec(`ALTER TABLE conversations ADD COLUMN converted_from TEXT DEFAULT NULL`); } catch { /* exists */ }
+  try { db.exec(`ALTER TABLE conversations ADD COLUMN message_count INTEGER NOT NULL DEFAULT 0`); } catch { /* exists */ }
+  try { db.exec(`ALTER TABLE conversations ADD COLUMN first_message_at TEXT DEFAULT NULL`); } catch { /* exists */ }
+  try { db.exec(`ALTER TABLE conversations ADD COLUMN last_tool_used TEXT DEFAULT NULL`); } catch { /* exists */ }
+  try { db.exec(`ALTER TABLE conversations ADD COLUMN session_source TEXT NOT NULL DEFAULT 'unknown'`); } catch { /* exists */ }
+  try { db.exec(`ALTER TABLE conversations ADD COLUMN prompt_version INTEGER DEFAULT NULL`); } catch { /* exists */ }
+
+  // Sprint 0: token_estimate on messages (CONVO-070)
+  try {
+    db.exec(`ALTER TABLE messages ADD COLUMN token_estimate INTEGER NOT NULL DEFAULT 0`);
+  } catch {
+    // Column already exists
+  }
+
+  // Sprint 0: Conversation events table (CONVO-070)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS conversation_events (
+      id TEXT PRIMARY KEY,
+      conversation_id TEXT NOT NULL,
+      event_type TEXT NOT NULL,
+      metadata TEXT NOT NULL DEFAULT '{}',
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE CASCADE
+    );
+    CREATE INDEX IF NOT EXISTS idx_conv_events_conv ON conversation_events(conversation_id);
+    CREATE INDEX IF NOT EXISTS idx_conv_events_type ON conversation_events(event_type);
+    CREATE INDEX IF NOT EXISTS idx_conv_events_created ON conversation_events(created_at);
+  `);
+
   // Embeddings table for vector search (§5.2)
   db.exec(`
     CREATE TABLE IF NOT EXISTS embeddings (
@@ -114,6 +152,26 @@ export function ensureSchema(db: Database.Database): void {
       stats_json TEXT NOT NULL,
       updated_at TEXT NOT NULL DEFAULT (datetime('now'))
     );
+  `);
+
+  // User files table — caches generated assets (audio, charts, etc.)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS user_files (
+      id TEXT PRIMARY KEY,
+      user_id TEXT NOT NULL,
+      conversation_id TEXT,
+      content_hash TEXT NOT NULL,
+      file_type TEXT NOT NULL,
+      file_name TEXT NOT NULL,
+      mime_type TEXT NOT NULL,
+      file_size INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      FOREIGN KEY (user_id) REFERENCES users(id),
+      FOREIGN KEY (conversation_id) REFERENCES conversations(id) ON DELETE SET NULL
+    );
+    CREATE INDEX IF NOT EXISTS idx_uf_user ON user_files(user_id);
+    CREATE INDEX IF NOT EXISTS idx_uf_hash ON user_files(user_id, content_hash, file_type);
+    CREATE INDEX IF NOT EXISTS idx_uf_conv ON user_files(conversation_id);
   `);
 
   // Seed roles
@@ -148,4 +206,154 @@ export function ensureSchema(db: Database.Database): void {
       ('usr_admin', 'role_admin')
   `);
   seedUserRoles.run();
+
+  // Sprint 3: System prompts table (CONVO-060)
+  db.exec(`
+    CREATE TABLE IF NOT EXISTS system_prompts (
+      id TEXT PRIMARY KEY,
+      role TEXT NOT NULL,
+      prompt_type TEXT NOT NULL,
+      content TEXT NOT NULL,
+      version INTEGER NOT NULL,
+      is_active INTEGER NOT NULL DEFAULT 0,
+      created_at TEXT NOT NULL DEFAULT (datetime('now')),
+      created_by TEXT DEFAULT NULL,
+      notes TEXT NOT NULL DEFAULT ''
+    );
+    CREATE UNIQUE INDEX IF NOT EXISTS idx_prompt_active
+      ON system_prompts(role, prompt_type) WHERE is_active = 1;
+  `);
+
+  // Sprint 3: Seed hardcoded prompts as version 1 (idempotent)
+  seedSystemPrompts(db);
 }
+
+function seedSystemPrompts(db: Database.Database): void {
+  const insert = db.prepare(`
+    INSERT OR IGNORE INTO system_prompts (id, role, prompt_type, content, version, is_active, notes)
+    VALUES (?, ?, ?, ?, 1, 1, 'Initial hardcoded seed')
+  `);
+
+  const seeds: Array<{ id: string; role: string; promptType: string; content: string }> =
+    SYSTEM_PROMPT_SEEDS;
+
+  const tx = db.transaction(() => {
+    for (const s of seeds) {
+      insert.run(s.id, s.role, s.promptType, s.content);
+    }
+  });
+  tx();
+}
+
+/**
+ * Hardcoded prompt seeds — exported so the DefaultingSystemPromptRepository
+ * can use them as fallbacks and tests can reference canonical content.
+ */
+export const SYSTEM_PROMPT_SEEDS: Array<{
+  id: string;
+  role: string;
+  promptType: string;
+  content: string;
+}> = [
+  {
+    id: "seed_base_all",
+    role: "ALL",
+    promptType: "base",
+    content: `
+You are a Product Development Advisor backed by a 10-book library on design, engineering, and PM.
+You exist within a chat-first app where the chat IS the primary navigation.
+
+RESPONSE STYLE — be miserly with words:
+- Lead with the answer in 1-3 sentences. No preamble, no filler ("Great question!", "I'd be happy to help").
+- Use bullet points over prose. Front-load the key insight.
+- Offload detail to tools: use search_books, get_chapter, or generate_audio to SHOW rather than describe.
+- Only go longer when the user explicitly asks for depth.
+
+TOOLS:
+- **calculator**: All math operations — MUST use.
+- **search_books**: Search 104 chapters by concept, practitioner, or topic.
+- **get_chapter**: Retrieve full chapter content.
+- **get_checklist**: Actionable checklists from chapter endings.
+- **list_practitioners**: Find key people referenced in the series.
+- **get_book_summary**: Overview of all 10 books and their chapters.
+- **set_theme**: Change the site aesthetic (bauhaus, swiss, postmodern, skeuomorphic, fluid).
+- **generate_audio**: Generate title + text for TTS. The frontend renders an Audio Player inline.
+- **navigate**: Send the user to a specific route.
+
+UI CONTROL:
+When you use \`set_theme\` or \`navigate\`, the tool dispatches a command to the client UI automatically.
+Do NOT output special command strings — just call the tool and continue your response.
+Demo concepts visually: if discussing Bauhaus, switch the theme so they see it.
+
+Cite books and chapters when referencing knowledge.
+
+DYNAMIC SUGGESTIONS (MANDATORY — never skip):
+At the very end of EVERY response — including after tool calls — append on its own line:
+__suggestions__:["Q1?","Q2?","Q3?","Q4?"]
+
+Rules:
+- 3-4 short, varied follow-ups relevant to what was discussed.
+- Mix: deeper dive, tool action ("Generate audio summary"), adjacent topic, practical application.
+- Each under 60 characters.
+- Only at the very end — never mid-response.
+- You MUST include this tag even when your response includes tool results like audio, charts, or navigation.`.trim(),
+  },
+  {
+    id: "seed_directive_anonymous",
+    role: "ANONYMOUS",
+    promptType: "role_directive",
+    content: [
+      "",
+      "ROLE CONTEXT — DEMO MODE:",
+      "The user is browsing without an account. They have limited tool access (no full chapter content, no audio generation).",
+      "Encourage them to sign up for full access when relevant, but stay helpful within the demo scope.",
+    ].join("\n"),
+  },
+  {
+    id: "seed_directive_authenticated",
+    role: "AUTHENTICATED",
+    promptType: "role_directive",
+    content: [
+      "",
+      "ROLE CONTEXT — REGISTERED USER:",
+      "The user is a registered member with full access to all tools and content.",
+      "You have access to `search_my_conversations` to recall past discussion topics. Use it when the user references something discussed previously or asks 'what did we talk about.'",
+    ].join("\n"),
+  },
+  {
+    id: "seed_directive_staff",
+    role: "STAFF",
+    promptType: "role_directive",
+    content: [
+      "",
+      "ROLE CONTEXT — STAFF MEMBER:",
+      "The user is a staff member. Full tool access with an analytics and operational framing.",
+      "You have access to `search_my_conversations` to recall past discussion topics. Use it when the user references something discussed previously or asks 'what did we talk about.'",
+    ].join("\n"),
+  },
+  {
+    id: "seed_directive_admin",
+    role: "ADMIN",
+    promptType: "role_directive",
+    content: [
+      "",
+      "ROLE CONTEXT — SYSTEM ADMINISTRATOR:",
+      "The user is a system administrator with full control over all tools, content, and configuration.",
+      "",
+      "ADMIN-ONLY CAPABILITIES (Corpus Management — via MCP Librarian tools):",
+      "- **librarian_list**: List all books in the corpus with metadata.",
+      "- **librarian_get_book**: Get a specific book's details and chapters.",
+      "- **librarian_add_book**: Add a new book (manual fields or zip archive upload).",
+      "- **librarian_add_chapter**: Add a chapter to an existing book.",
+      "- **librarian_remove_book**: Remove a book and all its chapters.",
+      "- **librarian_remove_chapter**: Remove a single chapter from a book.",
+      "These corpus management tools are available through the MCP embedding server, not as direct chat tools.",
+      "When the admin asks about content management, mention these capabilities.",
+      "",
+      "ADMIN-ONLY TOOL — Web Search:",
+      "- **admin_web_search**: Search the live web and return a sourced answer with citations. Use allowed_domains to target specific sites (e.g., allowed_domains=['en.wikipedia.org'] for Wikipedia research). You MUST call this tool directly when the admin asks you to search the web.",
+      "",
+      "You also have access to `search_my_conversations` to recall past discussion topics. Use it when the user references something discussed previously or asks 'what did we talk about.'",
+    ].join("\n"),
+  },
+];

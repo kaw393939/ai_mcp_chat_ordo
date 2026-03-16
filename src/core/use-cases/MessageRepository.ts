@@ -1,7 +1,7 @@
 import type { Message, NewMessage } from "../entities/conversation";
 
 export interface MessageRepository {
-  create(msg: NewMessage): Promise<Message>;
+  create(msg: NewMessage & { tokenEstimate?: number }): Promise<Message>;
   listByConversation(conversationId: string): Promise<Message[]>;
   countByConversation(conversationId: string): Promise<number>;
 }

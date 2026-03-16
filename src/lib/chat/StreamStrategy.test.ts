@@ -2,10 +2,9 @@ import { describe, it, expect, vi } from "vitest";
 import { 
   StreamProcessor, 
   TextDeltaStrategy, 
-  ToolCallStrategy, 
-  ToolResultStrategy 
+  ToolCallStrategy 
 } from "./StreamStrategy";
-import { StreamEvent } from "@/core/entities/chat-stream";
+import type { StreamEvent } from "@/core/entities/chat-stream";
 
 describe("StreamStrategy Processor", () => {
   it("should route text delta to dispatch", () => {

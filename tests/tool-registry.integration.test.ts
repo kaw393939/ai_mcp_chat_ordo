@@ -44,9 +44,9 @@ describe("Tool Registry Integration", () => {
   });
 
   // TEST-REG-01
-  it("registry has exactly 12 tools after full composition", () => {
+  it("registry has exactly 13 tools after full composition", () => {
     const { registry } = buildStack();
-    expect(registry.getToolNames()).toHaveLength(12);
+    expect(registry.getToolNames()).toHaveLength(13);
   });
 
   // TEST-REG-02
@@ -72,10 +72,10 @@ describe("Tool Registry Integration", () => {
   });
 
   // TEST-REG-04
-  it("AUTHENTICATED gets all 11 tools", () => {
+  it("AUTHENTICATED gets all 12 tools", () => {
     const { registry } = buildStack();
     const schemas = registry.getSchemasForRole("AUTHENTICATED");
-    expect(schemas).toHaveLength(11);
+    expect(schemas).toHaveLength(12);
   });
 
   // TEST-REG-05

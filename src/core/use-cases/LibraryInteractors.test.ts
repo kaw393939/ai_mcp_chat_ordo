@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from "vitest";
 import { PractitionerInteractor } from "./PractitionerInteractor";
 import { ChecklistInteractor } from "./ChecklistInteractor";
 import { BookSummaryInteractor } from "./BookSummaryInteractor";
-import { BookRepository } from "./BookRepository";
+import type { BookRepository } from "./BookRepository";
 import { Chapter } from "../entities/library";
 
 const mockChapters: Chapter[] = [

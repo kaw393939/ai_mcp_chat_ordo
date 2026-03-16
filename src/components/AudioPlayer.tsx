@@ -3,10 +3,21 @@
 import { useReducer, useRef, useEffect, useState, useCallback } from "react";
 import { ToolCard } from "./ToolCard";
 import { downloadFileFromUrl } from "../lib/download-browser";
+import {
+  createAudioElement,
+  getUserScrollBehavior,
+  scrollElementIntoView,
+  supportsIntersectionObserver,
+  supportsReadableStreamReader,
+} from "@/lib/ui/browserSupport";
 
 interface AudioPlayerProps {
   title: string;
   text: string;
+  /** If set, audio is already cached — skip TTS generation and serve from cache */
+  assetId?: string;
+  /** When true (e.g. restored from conversation history), don't auto-play */
+  autoPlay?: boolean;
 }
 
 /* ── helpers ─────────────────────────────────────────────────────── */
@@ -38,26 +49,24 @@ const LOADING_STAGES = [
 ];
 
 function useLoadingStage(isLoading: boolean) {
-  const [stage, setStage] = useState(0);
   const [elapsed, setElapsed] = useState(0);
 
   useEffect(() => {
     if (!isLoading) {
-      setStage(0);
-      setElapsed(0);
       return;
     }
     const start = Date.now();
     const tick = setInterval(() => {
       const ms = Date.now() - start;
       setElapsed(Math.floor(ms / 1000));
-      const next = LOADING_STAGES.findLastIndex((s) => ms >= s.delay);
-      if (next >= 0) setStage(next);
     }, 200);
     return () => clearInterval(tick);
   }, [isLoading]);
 
-  return { label: LOADING_STAGES[stage].label, elapsed };
+  const safeElapsed = isLoading ? elapsed : 0;
+  const stage = LOADING_STAGES.findLastIndex((s) => safeElapsed * 1000 >= s.delay);
+
+  return { label: LOADING_STAGES[stage].label, elapsed: safeElapsed };
 }
 
 /* ── state ───────────────────────────────────────────────────────── */
@@ -107,7 +116,7 @@ function audioReducer(state: AudioState, action: AudioAction): AudioState {
 
 /* ── component ───────────────────────────────────────────────────── */
 
-export function AudioPlayer({ title, text }: AudioPlayerProps) {
+export function AudioPlayer({ title, text, assetId, autoPlay = true }: AudioPlayerProps) {
   const [state, dispatch] = useReducer(audioReducer, {
     isPlaying: false,
     isLoading: false,
@@ -139,14 +148,56 @@ export function AudioPlayer({ title, text }: AudioPlayerProps) {
 
   /* ── core fetch with streaming progress ───────────────────────── */
 
-  const fetchAndPlay = useCallback(async () => {
+  const createAndPlay = useCallback(async (url: string, shouldAutoPlay = true) => {
+    const audio = createAudioElement(url);
+    if (!audio) {
+      dispatch({
+        type: "LOAD_ERROR",
+        error: "Audio playback is not supported in this browser.",
+      });
+      return;
+    }
+
+    audioRef.current = audio;
+
+    audio.addEventListener("timeupdate", () =>
+      dispatch({ type: "TIME_UPDATE", currentTime: audio.currentTime }),
+    );
+    audio.addEventListener("loadedmetadata", () =>
+      dispatch({ type: "DURATION_UPDATE", duration: audio.duration }),
+    );
+    audio.addEventListener("play", () => dispatch({ type: "PLAY" }));
+    audio.addEventListener("pause", () => dispatch({ type: "PAUSE" }));
+    audio.addEventListener("ended", () => dispatch({ type: "PAUSE" }));
+
+    if (shouldAutoPlay) {
+      // Auto-play — browsers may block without user gesture, so catch silently
+      try {
+        await audio.play();
+      } catch {
+        // Autoplay blocked; user can press play manually
+        dispatch({ type: "PAUSE" });
+      }
+    }
+  }, []);
+
+  const fetchAndPlay = useCallback(async (forcePlay = false) => {
     dispatch({ type: "START_LOAD" });
     try {
-      const response = await fetch("/api/tts", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ text }),
-      });
+      let response: Response;
+      let fromCache = !!assetId;
+
+      if (assetId) {
+        // Serve from user-file cache — no TTS call needed
+        response = await fetch(`/api/user-files/${encodeURIComponent(assetId)}`);
+      } else {
+        // Call TTS endpoint (which itself checks cache server-side)
+        response = await fetch("/api/tts", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ text }),
+        });
+      }
 
       if (!response.ok) {
         const body = await response.json().catch(() => null);
@@ -154,17 +205,25 @@ export function AudioPlayer({ title, text }: AudioPlayerProps) {
         throw new Error(msg);
       }
 
+      // Detect server-side cache hit via response header
+      if (!assetId && response.headers.get("X-User-File-Id")) {
+        fromCache = true;
+      }
+
       // Stream chunks for progress tracking
       const contentLength = response.headers.get("Content-Length");
       const totalBytes = contentLength ? parseInt(contentLength, 10) : 0;
-      const reader = response.body?.getReader();
+      const responseBody = response.body;
+      const reader = supportsReadableStreamReader(responseBody)
+        ? responseBody.getReader()
+        : null;
 
       if (!reader) {
-        // Fallback: no streaming support
+        // Fallback: no streaming reader support, so buffer the response first.
         const blob = await response.blob();
         const url = URL.createObjectURL(blob);
         dispatch({ type: "LOAD_SUCCESS", url });
-        await createAndPlay(url);
+        await createAndPlay(url, forcePlay || !fromCache);
         return;
       }
 
@@ -193,7 +252,7 @@ export function AudioPlayer({ title, text }: AudioPlayerProps) {
 
       // Try MediaSource streaming if supported, else use blob URL
       dispatch({ type: "LOAD_SUCCESS", url });
-      await createAndPlay(url);
+      await createAndPlay(url, forcePlay || !fromCache);
     } catch (err) {
       console.error(err);
       dispatch({
@@ -201,30 +260,7 @@ export function AudioPlayer({ title, text }: AudioPlayerProps) {
         error: err instanceof Error ? err.message : "Failed to generate audio.",
       });
     }
-  }, [text, estGenTime]);
-
-  async function createAndPlay(url: string) {
-    const audio = new Audio(url);
-    audioRef.current = audio;
-
-    audio.addEventListener("timeupdate", () =>
-      dispatch({ type: "TIME_UPDATE", currentTime: audio.currentTime }),
-    );
-    audio.addEventListener("loadedmetadata", () =>
-      dispatch({ type: "DURATION_UPDATE", duration: audio.duration }),
-    );
-    audio.addEventListener("play", () => dispatch({ type: "PLAY" }));
-    audio.addEventListener("pause", () => dispatch({ type: "PAUSE" }));
-    audio.addEventListener("ended", () => dispatch({ type: "PAUSE" }));
-
-    // Auto-play — browsers may block without user gesture, so catch silently
-    try {
-      await audio.play();
-    } catch {
-      // Autoplay blocked; user can press play manually
-      dispatch({ type: "PAUSE" });
-    }
-  }
+  }, [text, assetId, estGenTime, createAndPlay]);
 
   /* ── #1: Auto-generate on mount (guarded) ────────────────────────── */
 
@@ -232,14 +268,23 @@ export function AudioPlayer({ title, text }: AudioPlayerProps) {
     if (hasStarted.current) return;
     if (!text || text.trim().length === 0) return; // wait for text to arrive during streaming
     hasStarted.current = true;
-    fetchAndPlay();
-  }, [fetchAndPlay, text]);
+
+    if (assetId) {
+      // Cached asset — always load it (lightweight, serves from disk)
+      fetchAndPlay();
+    } else if (autoPlay) {
+      // First-time generation — only auto-fetch when autoPlay is true
+      fetchAndPlay();
+    }
+  }, [fetchAndPlay, text, assetId, autoPlay]);
 
   /* ── #5: Off-screen toast via IntersectionObserver ─────────────── */
 
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
+    if (!supportsIntersectionObserver()) return;
+
     const observer = new IntersectionObserver(
       ([entry]) => {
         // Audio just finished loading while off-screen
@@ -257,7 +302,7 @@ export function AudioPlayer({ title, text }: AudioPlayerProps) {
   }, [state.audioUrl, state.isLoading]);
 
   const scrollToPlayer = () => {
-    containerRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    scrollElementIntoView(containerRef.current, getUserScrollBehavior(), "center");
     setOffScreenReady(false);
   };
 
@@ -265,6 +310,13 @@ export function AudioPlayer({ title, text }: AudioPlayerProps) {
 
   function handlePlayToggle() {
     if (state.error || state.isLoading) return;
+
+    // If audio isn't loaded yet (e.g. autoPlay was false), fetch and play now
+    if (!audioRef.current && !state.audioUrl) {
+      fetchAndPlay(true);
+      return;
+    }
+
     if (audioRef.current) {
       if (state.isPlaying) {
         audioRef.current.pause();
@@ -308,17 +360,19 @@ export function AudioPlayer({ title, text }: AudioPlayerProps) {
   const subtitleContent = state.error ? (
     <span className="text-red-500">{state.error}</span>
   ) : state.isLoading ? (
-    <span className="text-[var(--accent-color)] animate-pulse">
+    <span className="text-accent animate-pulse">
       {loadingStage.label} ({loadingStage.elapsed}s)
       {" · "}
       <span className="opacity-70">
         ~{estDuration}s audio · est. {estGenTime}s to generate
       </span>
     </span>
-  ) : (
+  ) : state.audioUrl ? (
     <span>
       OpenAI Speech · {formatTime(state.duration)}
     </span>
+  ) : (
+    <span className="opacity-70">Click play to load · ~{estDuration}s audio</span>
   );
 
   /* ── render ────────────────────────────────────────────────────── */
@@ -352,9 +406,9 @@ export function AudioPlayer({ title, text }: AudioPlayerProps) {
           <div className="flex flex-col gap-2 px-3 py-2.5 w-full">
             {/* ── Progress bar (during loading) ──────────────────────── */}
             {state.isLoading && (
-              <div className="w-full h-1 rounded-full bg-[var(--border-color)] overflow-hidden">
+              <div className="w-full h-1 rounded-full bg-border overflow-hidden">
                 <div
-                  className="h-full bg-[var(--accent-color)] rounded-full transition-all duration-300 ease-out"
+                  className="h-full bg-accent rounded-full transition-all duration-300 ease-out"
                   style={{ width: `${progressPercent}%` }}
                 />
               </div>
@@ -379,7 +433,7 @@ export function AudioPlayer({ title, text }: AudioPlayerProps) {
                     <path d="M12 2a10 10 0 0 1 10 10" strokeLinecap="round" />
                   </svg>
                 ) : state.isPlaying ? (
-                  <svg className="w-4 h-4 fill-current ml-[1px]" viewBox="0 0 24 24">
+                  <svg className="w-4 h-4 fill-current ml-px" viewBox="0 0 24 24">
                     <rect x="6" y="4" width="4" height="16" />
                     <rect x="14" y="4" width="4" height="16" />
                   </svg>
@@ -423,7 +477,7 @@ export function AudioPlayer({ title, text }: AudioPlayerProps) {
 
       {/* ── #5: Off-screen toast ──────────────────────────────────── */}
       {offScreenReady && (
-        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[9999] animate-in slide-in-from-bottom-4 fade-in duration-300">
+        <div className="fixed bottom-6 left-1/2 z-9999 -translate-x-1/2 animate-in slide-in-from-bottom-4 fade-in duration-300">
           <button
             type="button"
             onClick={scrollToPlayer}

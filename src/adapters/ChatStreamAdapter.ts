@@ -1,5 +1,5 @@
-import { StreamEvent } from "../core/entities/chat-stream";
-import { ChatStream, ChatStreamProvider } from "../core/use-cases/ChatStreamProvider";
+import type { StreamEvent } from "../core/entities/chat-stream";
+import type { ChatStream, ChatStreamProvider } from "../core/use-cases/ChatStreamProvider";
 import { 
   EventParser, 
   TextDeltaParser, 
@@ -59,7 +59,7 @@ export class ChatStreamAdapter implements ChatStreamProvider {
               const data = JSON.parse(dataStr);
               const event = parser.parse(data);
               if (event) yield event;
-            } catch (e) {
+            } catch {
               console.warn("Invalid SSE JSON:", dataStr);
             }
           }

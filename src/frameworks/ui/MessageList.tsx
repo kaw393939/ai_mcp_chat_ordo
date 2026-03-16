@@ -10,18 +10,19 @@ interface MessageListProps {
   onSuggestionClick: (text: string) => void;
   onLinkClick: (slug: string) => void;
   searchQuery: string;
+  isEmbedded?: boolean;
 }
 
-const BrandHeader = () => (
-  <div className="flex flex-col items-center justify-center pt-4 sm:pt-8 pb-2 sm:pb-3 px-3 sm:px-4 text-center space-y-2 sm:space-y-3 animate-in fade-in slide-in-from-top-4 duration-1000 ease-out fill-mode-both">
-    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-[var(--accent-color)]/10 border border-[var(--accent-color)]/20 text-[var(--accent-color)] text-label brand-pulse">
-      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-color)]" />
+const BrandHeader = ({ isEmbedded = false }: { isEmbedded?: boolean }) => (
+  <div className={`flex flex-col items-center justify-center px-3 text-center animate-in fade-in slide-in-from-top-4 duration-1000 ease-out fill-mode-both sm:px-4 ${isEmbedded ? "pt-3 pb-2 space-y-2 sm:pt-5 sm:pb-3 sm:space-y-2.5" : "pt-4 pb-2 space-y-2 sm:pt-8 sm:pb-3 sm:space-y-3"}`}>
+    <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-accent/10 border border-accent/20 text-accent text-label brand-pulse">
+      <span className="w-1.5 h-1.5 rounded-full bg-accent" />
       System Operational
     </div>
     
-    <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight leading-tight text-[var(--foreground)] balance">
+    <h1 className="text-xl sm:text-2xl md:text-3xl font-black tracking-tight leading-tight text-foreground balance">
       Product Development <br />
-      <span className="text-transparent bg-clip-text bg-gradient-to-r from-[var(--accent-color)] to-[var(--accent-color)]/60">
+      <span className="text-transparent bg-clip-text bg-gradient-to-r from-accent to-accent/60">
         in the AI Era.
       </span>
     </h1>
@@ -35,6 +36,7 @@ export const MessageList: React.FC<MessageListProps> = React.memo(({
   onSuggestionClick,
   onLinkClick,
   searchQuery,
+  isEmbedded = false,
 }) => {
   const filteredMessages = searchQuery
     ? messages.filter((m) =>
@@ -55,9 +57,13 @@ export const MessageList: React.FC<MessageListProps> = React.memo(({
   }
 
   return (
-    <div className="mx-auto w-full max-w-3xl flex flex-col pb-8" style={{ gap: 'var(--message-gap)' }}>
+    <div
+      className={`mx-auto flex w-full max-w-3xl flex-col ${isEmbedded ? "pb-4 sm:pb-5" : "pb-8"}`}
+      data-message-list-mode={isEmbedded ? "embedded" : "floating"}
+      style={{ gap: "var(--message-gap)" }}
+    >
       {/* Show the grand brand header at the start of the conversation */}
-      {messages.length <= 2 && !searchQuery && <BrandHeader />}
+      {messages.length <= 2 && !searchQuery && <BrandHeader isEmbedded={isEmbedded} />}
 
       {filteredMessages.map((message, index) => (
         <div key={message.id} className="flex flex-col gap-2 animate-in fade-in slide-in-from-bottom-3 duration-700 ease-out fill-mode-both">
@@ -143,13 +149,13 @@ const AssistantBubble = React.memo<{
   return (
     <div className="flex justify-start gap-2.5 sm:gap-4 items-start px-1 sm:px-2 md:px-0 w-full transition-all duration-300 group">
       {/* Assistant Avatar */}
-      <div className={`w-8 h-8 mt-1 rounded-full flex items-center justify-center shrink-0 border shadow-sm ${isInitialGreeting ? "bg-[var(--accent-color)]/15 border-[var(--accent-color)]/30" : "bg-[var(--surface-muted)] border-[var(--border-color)]"}`}>
-        <span className={`text-[10px] font-bold ${isInitialGreeting ? "text-[var(--accent-color)]" : "text-[var(--foreground)]/60"}`}>A</span>
+      <div className={`w-8 h-8 mt-1 rounded-full flex items-center justify-center shrink-0 border shadow-sm ${isInitialGreeting ? "bg-accent/15 border-accent/30" : "bg-surface-muted border-border"}`}>
+        <span className={`text-[10px] font-bold ${isInitialGreeting ? "text-accent" : "text-foreground/60"}`}>A</span>
       </div>
 
       {/* Borderless Content Area */}
       <div className={`flex flex-col gap-1.5 max-w-[95%] sm:max-w-[90%] w-full ${isInitialGreeting ? "pt-1" : ""}`}>
-        <div className="text-[13px] sm:text-sm leading-relaxed text-[var(--foreground)] relative">
+        <div className="text-[13px] sm:text-sm leading-relaxed text-foreground relative">
           <ErrorBoundary name="AssistantBubble">
             {isInitialGreeting ? (
               <div className="relative">
@@ -162,7 +168,7 @@ const AssistantBubble = React.memo<{
                   {isTyping ? (
                     <div className="inline whitespace-pre-wrap">
                       {displayText}
-                      <span className="inline-block w-1.5 h-4 ms-1 bg-[var(--accent-color)] animate-pulse align-middle" />
+                      <span className="inline-block w-1.5 h-4 ms-1 bg-accent animate-pulse align-middle" />
                     </div>
                   ) : (
                     <div className="animate-in fade-in duration-500">
@@ -180,7 +186,7 @@ const AssistantBubble = React.memo<{
           </ErrorBoundary>
 
           {isStreaming && !isInitialGreeting && (
-            <span className="inline-block w-1 h-3.5 bg-[var(--accent-color)] animate-pulse align-middle ms-1 rounded-sm relative -top-0.5" />
+            <span className="inline-block w-1 h-3.5 bg-accent animate-pulse align-middle ms-1 rounded-sm relative -top-0.5" />
           )}
         </div>
       </div>
@@ -193,9 +199,9 @@ AssistantBubble.displayName = "AssistantBubble";
 const TypingIndicator = () => (
   <div className="flex justify-start gap-2.5 items-center ms-12 mt-2">
     <div className="flex gap-1.5 items-center px-2 py-1">
-      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-color)] opacity-60 animate-bounce [animation-delay:0ms]" />
-      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-color)] opacity-60 animate-bounce [animation-delay:120ms]" />
-      <span className="w-1.5 h-1.5 rounded-full bg-[var(--accent-color)] opacity-60 animate-bounce [animation-delay:240ms]" />
+      <span className="w-1.5 h-1.5 rounded-full bg-accent opacity-60 animate-bounce [animation-delay:0ms]" />
+      <span className="w-1.5 h-1.5 rounded-full bg-accent opacity-60 animate-bounce [animation-delay:120ms]" />
+      <span className="w-1.5 h-1.5 rounded-full bg-accent opacity-60 animate-bounce [animation-delay:240ms]" />
     </div>
   </div>
 );
@@ -211,7 +217,7 @@ const SuggestionChips: React.FC<{
           key={s}
           onClick={() => onSend(s)}
           style={{ animationDelay: `${i * 100}ms` }}
-          className="rounded-xl border-theme bg-[var(--surface)] hover:bg-[var(--accent-color)] hover:text-[var(--accent-foreground)] hover:border-[var(--accent-color)] px-3 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-xs font-medium text-[var(--foreground)] transition-all duration-200 hover:scale-[1.02] active:scale-95 shadow-sm hover:shadow-md animate-in fade-in slide-in-from-bottom-2 duration-500 fill-mode-both"
+          className="rounded-theme border-theme bg-surface hover:bg-accent hover:text-accent-foreground hover:border-accent px-3 sm:px-4 py-2 sm:py-2.5 text-[11px] sm:text-xs font-medium text-foreground transition-all duration-200 hover:scale-[1.02] active:scale-95 shadow-sm hover:shadow-md animate-in fade-in slide-in-from-bottom-2 duration-500 fill-mode-both focus-ring"
         >
           {s}
         </button>

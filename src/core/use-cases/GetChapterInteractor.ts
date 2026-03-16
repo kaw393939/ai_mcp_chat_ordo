@@ -1,6 +1,5 @@
-import { UseCase } from "../common/UseCase";
-import { BookRepository } from "./BookRepository";
-import { Chapter } from "../entities/library";
+import type { UseCase } from "../common/UseCase";
+import type { BookRepository } from "./BookRepository";
 
 export interface GetChapterRequest {
   bookSlug: string;

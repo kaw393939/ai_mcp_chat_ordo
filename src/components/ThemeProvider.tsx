@@ -1,6 +1,11 @@
 "use client";
 
 import React, { createContext, useContext, useEffect, useState } from "react";
+import {
+  prefersDarkColorScheme,
+  supportsReducedMotion,
+  supportsViewTransitions,
+} from "@/lib/ui/browserSupport";
 
 export type { Theme } from "@/core/entities/theme";
 import type { Theme } from "@/core/entities/theme";
@@ -94,7 +99,7 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     const storedDark = localStorage.getItem("pda-dark");
     if (storedDark !== null) {
       setIsDark(storedDark === "true");
-    } else if (window.matchMedia("(prefers-color-scheme: dark)").matches) {
+    } else if (prefersDarkColorScheme()) {
       setIsDark(true);
     }
 
@@ -173,7 +178,11 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       }
     };
 
-    if (document.startViewTransition && document.visibilityState === "visible") {
+    if (
+      supportsViewTransitions() &&
+      !supportsReducedMotion() &&
+      document.visibilityState === "visible"
+    ) {
       document.startViewTransition(updateState);
     } else {
       updateState();

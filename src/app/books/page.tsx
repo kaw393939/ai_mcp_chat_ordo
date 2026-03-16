@@ -15,8 +15,8 @@ export default async function BooksIndex() {
   });
 
   return (
-    <div className="min-h-screen bg-[var(--background)] text-[var(--foreground)] transition-colors duration-300">
-      <div className="mx-auto max-w-4xl px-6 py-16">
+    <div className="flex-1 overflow-y-auto bg-background text-foreground transition-colors duration-300">
+      <div className="mx-auto max-w-4xl px-[var(--container-padding)] py-16">
         <header className="mb-16 text-center">
           <h1 className="text-4xl sm:text-5xl font-bold tracking-tight mb-4">
             The Product Development Library
@@ -33,14 +33,14 @@ export default async function BooksIndex() {
             <Link
               key={book.slug}
               href={`/books/${book.slug}`}
-              className="group block rounded-xl border-theme p-6 transition-all duration-200 hover:border-[var(--accent-color)]/50 hover:shadow-lg hover:shadow-[var(--accent-color)]/5 hover:-translate-y-0.5"
+              className="group block rounded-theme border-theme p-6 transition-all duration-200 hover:border-accent/50 hover:shadow-lg hover:shadow-accent/5 hover:-translate-y-0.5"
             >
               <div className="flex items-start gap-4">
                 <span className="shrink-0 text-xs font-bold uppercase tracking-wider opacity-40 pt-1">
                   {book.number}
                 </span>
                 <div>
-                  <h2 className="text-lg font-semibold group-hover:text-accent-theme transition-colors">
+                  <h2 className="text-lg font-semibold group-hover:text-accent transition-colors">
                     {book.title}
                   </h2>
                   <p className="text-sm opacity-60 mt-1">
@@ -55,7 +55,7 @@ export default async function BooksIndex() {
         <div className="mt-16 text-center">
           <Link
             href="/"
-            className="text-xs uppercase tracking-wider font-bold text-accent-theme hover:opacity-80 transition-opacity"
+            className="text-xs uppercase tracking-wider font-bold text-accent hover:opacity-80 transition-opacity"
           >
             ← Back to Chat
           </Link>

@@ -1,6 +1,7 @@
 import type { Embedder } from "./ports/Embedder";
 import type { VectorStore } from "./ports/VectorStore";
 import { MarkdownChunker } from "./MarkdownChunker";
+import { ConversationChunker } from "./ConversationChunker";
 import { ChangeDetector } from "./ChangeDetector";
 import { EmbeddingPipeline } from "./EmbeddingPipeline";
 
@@ -18,10 +19,9 @@ export class EmbeddingPipelineFactory {
   createForSource(
     sourceType: "book_chunk" | "conversation",
   ): EmbeddingPipeline {
-    if (sourceType === "conversation") {
-      throw new Error("ConversationChunker not yet implemented");
-    }
-    const chunker = new MarkdownChunker();
+    const chunker = sourceType === "conversation"
+      ? new ConversationChunker()
+      : new MarkdownChunker();
     const changeDetector = new ChangeDetector(this.vectorStore);
     return new EmbeddingPipeline(
       chunker,

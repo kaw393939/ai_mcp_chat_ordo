@@ -1,4 +1,4 @@
-import { Command } from "./Command";
+import type { Command } from "./Command";
 
 /**
  * Concrete Command: Handles Navigation

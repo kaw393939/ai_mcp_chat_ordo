@@ -1,4 +1,4 @@
-import { ChatStreamProvider } from "../core/use-cases/ChatStreamProvider";
+import type { ChatStreamProvider } from "../core/use-cases/ChatStreamProvider";
 import { ChatStreamAdapter } from "./ChatStreamAdapter";
 
 /**

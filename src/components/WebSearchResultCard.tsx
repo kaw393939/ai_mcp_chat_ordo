@@ -250,9 +250,9 @@ export function WebSearchResultCard({ query, allowed_domains, model }: Props) {
               </p>
             )}
             {/* Progress bar */}
-            <div className="h-1 rounded-full bg-[var(--surface-muted)] overflow-hidden mt-1">
+            <div className="h-1 rounded-full bg-surface-muted overflow-hidden mt-1">
               <div
-                className="h-full bg-[var(--accent-color)] rounded-full transition-all duration-500 ease-out"
+                className="h-full bg-accent rounded-full transition-all duration-500 ease-out"
                 style={{ width: `${Math.min(95, (state.elapsedMs / 65000) * 100)}%` }}
               />
             </div>
@@ -270,7 +270,7 @@ export function WebSearchResultCard({ query, allowed_domains, model }: Props) {
         {state.result && (
           <div className="p-4 flex flex-col gap-3">
             {/* Answer */}
-            <div className="text-sm leading-relaxed whitespace-pre-wrap text-[var(--foreground)]">
+            <div className="text-sm leading-relaxed whitespace-pre-wrap text-foreground">
               {state.result.answer}
             </div>
 
@@ -317,7 +317,7 @@ export function WebSearchResultCard({ query, allowed_domains, model }: Props) {
                           href={url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded-full bg-[var(--surface-muted)] border border-[var(--border-color)] hover:border-[var(--accent-color)] transition-colors"
+                          className="inline-flex items-center gap-1 px-2 py-0.5 text-[10px] rounded-full bg-surface-muted border-theme hover:border-accent transition-colors"
                         >
                           {domain}
                         </a>

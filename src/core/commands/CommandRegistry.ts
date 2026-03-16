@@ -1,4 +1,4 @@
-import { Command } from "./Command";
+import type { Command } from "./Command";
 
 /**
  * Singleton Registry for all system commands.

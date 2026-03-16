@@ -76,14 +76,16 @@ export function errorJson(
   status: number,
 ) {
   const elapsed = durationMs(context.startedAt);
-  const errorCode = getErrorCode(message);
+  const errorCode = getErrorCode(message, status);
+  const isServerError = status >= 500;
 
-  recordRouteMetric(context.route, elapsed, true);
-  logEvent("error", "request.error", {
+  recordRouteMetric(context.route, elapsed, isServerError);
+  logEvent(isServerError ? "error" : "info", "request.error", {
     route: context.route,
     requestId: context.requestId,
     durationMs: elapsed,
     errorCode,
+    status,
     message,
   });
 

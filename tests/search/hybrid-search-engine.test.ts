@@ -17,7 +17,6 @@ function makeRecord(
   content: string,
   opts: Partial<EmbeddingRecord> & { chapterSlug?: string; bookSlug?: string; bookTitle?: string; chapterTitle?: string; bookNumber?: string } = {},
 ): EmbeddingRecord {
-  const embedder = new MockEmbedder();
   // We'll set embedding in the test setup
   return {
     id,
@@ -32,12 +31,13 @@ function makeRecord(
     modelVersion: "test",
     embedding: new Float32Array(384), // will be replaced
     metadata: {
-      type: "book",
+      sourceType: "book_chunk",
       bookTitle: opts.bookTitle ?? "Book One",
       bookNumber: opts.bookNumber ?? "1",
       bookSlug: opts.bookSlug ?? "book-1",
       chapterTitle: opts.chapterTitle ?? "Chapter One",
       chapterSlug: opts.chapterSlug ?? "ch-1",
+      chapterFirstSentence: content.split(".")[0] ?? content,
     } as BookChunkMetadata,
     ...opts,
     // restore metadata
@@ -180,7 +180,7 @@ describe("HybridSearchEngine", () => {
   it("BM25: rare term scores higher than common term", async () => {
     const { engine } = await setup();
     const heuristicResults = await engine.search("heuristic");
-    const designResults = await engine.search("design");
+    await engine.search("design");
 
     // "heuristic" is rarer, so the design-chapter with heuristic content
     // should rank higher for "heuristic" than for generic "design"

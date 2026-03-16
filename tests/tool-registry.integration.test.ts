@@ -67,7 +67,7 @@ describe("Tool Registry Integration", () => {
     const schemas = registry.getSchemasForRole("ANONYMOUS");
     const names = schemas.map(s => s.name).sort();
     expect(names).toEqual([
-      "adjust_ui", "calculator", "get_book_summary", "navigate", "search_books", "set_theme",
+      "adjust_ui", "calculator", "get_corpus_summary", "navigate", "search_corpus", "set_theme",
     ]);
   });
 
@@ -86,9 +86,9 @@ describe("Tool Registry Integration", () => {
   });
 
   // TEST-REG-06
-  it("ANONYMOUS executing get_chapter → ToolAccessDeniedError, command never called", async () => {
+  it("ANONYMOUS executing get_section → ToolAccessDeniedError, command never called", async () => {
     const { executor } = buildStack();
-    await expect(executor("get_chapter", { book_slug: "x", chapter_slug: "y" }, anonCtx))
+    await expect(executor("get_section", { document_slug: "x", section_slug: "y" }, anonCtx))
       .rejects.toThrow(ToolAccessDeniedError);
   });
 
@@ -110,13 +110,13 @@ describe("Tool Registry Integration", () => {
 
   it("logs START + ERROR for denied access", async () => {
     const { executor } = buildStack();
-    try { await executor("get_chapter", {}, anonCtx); } catch { /* expected */ }
+    try { await executor("get_section", {}, anonCtx); } catch { /* expected */ }
     const allLogs = [
       ...logSpy.mock.calls.map((c: unknown[]) => c[0] as string),
       ...errorSpy.mock.calls.map((c: unknown[]) => c[0] as string),
     ];
-    expect(allLogs.some(l => l.includes("[Tool:get_chapter] START"))).toBe(true);
-    expect(allLogs.some(l => l.includes("[Tool:get_chapter] ERROR"))).toBe(true);
+    expect(allLogs.some(l => l.includes("[Tool:get_section] START"))).toBe(true);
+    expect(allLogs.some(l => l.includes("[Tool:get_section] ERROR"))).toBe(true);
   });
 });
 

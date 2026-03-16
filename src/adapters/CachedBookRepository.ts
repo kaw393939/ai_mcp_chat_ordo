@@ -35,6 +35,14 @@ export class CachedBookRepository implements BookRepository {
     return book;
   }
 
+  async getAllDocuments(): Promise<Book[]> {
+    return this.getAllBooks();
+  }
+
+  async getDocument(slug: string): Promise<Book | null> {
+    return this.getBook(slug);
+  }
+
   async getChaptersByBook(bookSlug: string): Promise<Chapter[]> {
     if (this.chaptersByBookCache.has(bookSlug)) {
       return this.chaptersByBookCache.get(bookSlug) ?? [];
@@ -52,6 +60,14 @@ export class CachedBookRepository implements BookRepository {
     return this.allChaptersCache;
   }
 
+  async getSectionsByDocument(documentSlug: string): Promise<Chapter[]> {
+    return this.getChaptersByBook(documentSlug);
+  }
+
+  async getAllSections(): Promise<Chapter[]> {
+    return this.getAllChapters();
+  }
+
   async getChapter(bookSlug: string, chapterSlug: string): Promise<Chapter> {
     const key = `${bookSlug}/${chapterSlug}`;
     if (this.chapterCache.has(key)) {
@@ -64,5 +80,9 @@ export class CachedBookRepository implements BookRepository {
     const chapter = await this.inner.getChapter(bookSlug, chapterSlug);
     this.chapterCache.set(key, chapter);
     return chapter;
+  }
+
+  async getSection(documentSlug: string, sectionSlug: string): Promise<Chapter> {
+    return this.getChapter(documentSlug, sectionSlug);
   }
 }

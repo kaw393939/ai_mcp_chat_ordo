@@ -2,7 +2,7 @@ import type { SearchHandler } from "./ports/SearchHandler";
 import type { HybridSearchResult, VectorQuery, VectorStore } from "./types";
 import type { Embedder } from "./ports/Embedder";
 import type { BM25IndexStore } from "./ports/BM25IndexStore";
-import type { BookQuery, ChapterQuery } from "../use-cases/BookRepository";
+import type { CorpusQuery, SectionQuery } from "../use-cases/CorpusRepository";
 import type { HybridSearchEngine } from "./HybridSearchEngine";
 import type { BM25Scorer } from "./BM25Scorer";
 import type { QueryProcessor } from "./QueryProcessor";
@@ -37,17 +37,18 @@ export class HybridSearchHandler extends BaseSearchHandler {
     private readonly engine: HybridSearchEngine,
     private readonly embedder: Embedder,
     private readonly bm25IndexStore: BM25IndexStore,
+    private readonly sourceType: string = "document_chunk",
   ) {
     super();
   }
 
   canHandle(): boolean {
-    return this.embedder.isReady() && this.bm25IndexStore.getIndex("book_chunk") !== null;
+    return this.embedder.isReady() && this.bm25IndexStore.getIndex(this.sourceType) !== null;
   }
 
   async search(query: string, filters?: VectorQuery): Promise<HybridSearchResult[]> {
     if (!this.canHandle()) return this.passToNext(query, filters);
-    return this.engine.search(query, filters);
+    return this.engine.search(query, { ...filters, sourceType: filters?.sourceType ?? this.sourceType });
   }
 }
 
@@ -57,18 +58,19 @@ export class BM25SearchHandler extends BaseSearchHandler {
     private readonly bm25IndexStore: BM25IndexStore,
     private readonly vectorStore: VectorStore,
     private readonly bm25QueryProcessor: QueryProcessor,
+    private readonly sourceType: string = "document_chunk",
   ) {
     super();
   }
 
   canHandle(): boolean {
-    return this.bm25IndexStore.getIndex("book_chunk") !== null;
+    return this.bm25IndexStore.getIndex(this.sourceType) !== null;
   }
 
   async search(query: string, filters?: VectorQuery): Promise<HybridSearchResult[]> {
     if (!this.canHandle()) return this.passToNext(query, filters);
 
-    const bm25Index = this.bm25IndexStore.getIndex("book_chunk");
+    const bm25Index = this.bm25IndexStore.getIndex(filters?.sourceType ?? this.sourceType);
     if (!bm25Index) return this.passToNext(query, filters);
 
     const queryTerms = this.bm25QueryProcessor.process(query);
@@ -87,18 +89,28 @@ export class BM25SearchHandler extends BaseSearchHandler {
 
     return top.map((item, rank) => {
       const meta = item.record.metadata as {
+        documentTitle?: string;
+        documentId?: string;
+        documentSlug?: string;
+        sectionTitle?: string;
+        sectionSlug?: string;
         bookTitle?: string;
         bookNumber?: string;
         bookSlug?: string;
         chapterTitle?: string;
         chapterSlug?: string;
       };
+      const documentTitle = meta.documentTitle ?? meta.bookTitle ?? "";
+      const documentId = meta.documentId ?? meta.bookNumber ?? "";
+      const documentSlug = meta.documentSlug ?? meta.bookSlug ?? "";
+      const sectionTitle = meta.sectionTitle ?? meta.chapterTitle ?? "";
+      const sectionSlug = meta.sectionSlug ?? meta.chapterSlug ?? "";
       return {
-        bookTitle: meta.bookTitle ?? "",
-        bookNumber: meta.bookNumber ?? "",
-        bookSlug: meta.bookSlug ?? "",
-        chapterTitle: meta.chapterTitle ?? "",
-        chapterSlug: meta.chapterSlug ?? "",
+        documentTitle,
+        documentId,
+        documentSlug,
+        sectionTitle,
+        sectionSlug,
         rrfScore: item.score,
         vectorRank: null,
         bm25Rank: rank + 1,
@@ -107,6 +119,11 @@ export class BM25SearchHandler extends BaseSearchHandler {
         matchSection: item.record.heading,
         matchHighlight: item.record.content,
         passageOffset: { start: 0, end: item.record.content.length },
+        bookTitle: documentTitle,
+        bookNumber: documentId,
+        bookSlug: documentSlug,
+        chapterTitle: sectionTitle,
+        chapterSlug: sectionSlug,
       };
     });
   }
@@ -114,7 +131,10 @@ export class BM25SearchHandler extends BaseSearchHandler {
 
 export class LegacyKeywordHandler extends BaseSearchHandler {
   constructor(
-    private readonly bookRepository: BookQuery & ChapterQuery,
+    private readonly corpusRepository: (CorpusQuery & SectionQuery) | {
+      getAllBooks(): Promise<Array<{ slug: string; title: string; number: string; id?: string }>>;
+      getAllChapters(): Promise<Array<{ documentSlug: string; sectionSlug: string; title: string; calculateSearchScore(queryLower: string, queryTerms: string[]): { score: number; matchContext: string } }>>;
+    },
   ) {
     super();
   }
@@ -124,8 +144,12 @@ export class LegacyKeywordHandler extends BaseSearchHandler {
   }
 
   async search(query: string): Promise<HybridSearchResult[]> {
-    const books = await this.bookRepository.getAllBooks();
-    const chapters = await this.bookRepository.getAllChapters();
+    const documents = "getAllDocuments" in this.corpusRepository
+      ? await this.corpusRepository.getAllDocuments()
+      : await this.corpusRepository.getAllBooks();
+    const sections = "getAllSections" in this.corpusRepository
+      ? await this.corpusRepository.getAllSections()
+      : await this.corpusRepository.getAllChapters();
     const results: HybridSearchResult[] = [];
 
     const queryLower = query.toLowerCase();
@@ -133,18 +157,18 @@ export class LegacyKeywordHandler extends BaseSearchHandler {
 
     if (queryTerms.length === 0 && queryLower.length <= 2) return [];
 
-    for (const chapter of chapters) {
-      const book = books.find((b) => b.slug === chapter.bookSlug);
-      if (!book) continue;
+    for (const section of sections) {
+      const document = documents.find((item) => item.slug === section.documentSlug);
+      if (!document) continue;
 
-      const { score, matchContext } = chapter.calculateSearchScore(queryLower, queryTerms);
+      const { score, matchContext } = section.calculateSearchScore(queryLower, queryTerms);
       if (score > 0) {
         results.push({
-          bookTitle: book.title,
-          bookNumber: book.number,
-          bookSlug: book.slug,
-          chapterTitle: chapter.title,
-          chapterSlug: chapter.chapterSlug,
+          documentTitle: document.title,
+          documentId: document.id,
+          documentSlug: document.slug,
+          sectionTitle: section.title,
+          sectionSlug: section.sectionSlug,
           rrfScore: score,
           vectorRank: null,
           bm25Rank: null,
@@ -153,6 +177,11 @@ export class LegacyKeywordHandler extends BaseSearchHandler {
           matchSection: null,
           matchHighlight: matchContext,
           passageOffset: { start: 0, end: 0 },
+          bookTitle: document.title,
+          bookNumber: document.id,
+          bookSlug: document.slug,
+          chapterTitle: section.title,
+          chapterSlug: section.sectionSlug,
         });
       }
     }

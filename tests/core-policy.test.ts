@@ -56,15 +56,15 @@ describe("ToolRegistry RBAC", () => {
     expect(schemas).toHaveLength(6);
     const names = schemas.map((s) => s.name);
     expect(names).toContain("calculator");
-    expect(names).toContain("search_books");
-    expect(names).toContain("get_book_summary");
+    expect(names).toContain("search_corpus");
+    expect(names).toContain("get_corpus_summary");
     expect(names).toContain("set_theme");
     expect(names).toContain("navigate");
     expect(names).toContain("adjust_ui");
   });
 
   it("ANONYMOUS cannot execute restricted tools", () => {
-    expect(registry.canExecute("get_chapter", "ANONYMOUS")).toBe(false);
+    expect(registry.canExecute("get_section", "ANONYMOUS")).toBe(false);
     expect(registry.canExecute("get_checklist", "ANONYMOUS")).toBe(false);
     expect(registry.canExecute("generate_audio", "ANONYMOUS")).toBe(false);
     expect(registry.canExecute("generate_chart", "ANONYMOUS")).toBe(false);

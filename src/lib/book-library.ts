@@ -98,11 +98,11 @@ export async function searchBooks(
     const results = await searchInteractor.execute({ query, maxResults });
 
     return results.map((r) => ({
-      book: `${r.bookNumber}. ${r.bookTitle}`,
-      bookNumber: r.bookNumber,
-      chapter: r.chapterTitle,
-      chapterSlug: r.chapterSlug,
-      bookSlug: r.bookSlug,
+      book: `${r.bookNumber ?? ""}. ${r.bookTitle ?? ""}`.trim(),
+      bookNumber: r.bookNumber ?? "",
+      chapter: r.chapterTitle ?? "",
+      chapterSlug: r.chapterSlug ?? "",
+      bookSlug: r.bookSlug ?? "",
       matchContext: r.matchContext,
       relevance: r.relevance,
     }));

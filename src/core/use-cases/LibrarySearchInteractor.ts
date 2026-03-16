@@ -20,11 +20,16 @@ export class LibrarySearchInteractor implements UseCase<SearchRequest, LibrarySe
     if (this.searchHandler) {
       const hybridResults = await this.searchHandler.search(query);
       return hybridResults.slice(0, maxResults).map((hr) => ({
-        bookTitle: hr.bookTitle,
-        bookNumber: hr.bookNumber,
-        bookSlug: hr.bookSlug,
-        chapterTitle: hr.chapterTitle,
-        chapterSlug: hr.chapterSlug,
+        documentTitle: hr.documentTitle,
+        documentId: hr.documentId,
+        documentSlug: hr.documentSlug,
+        sectionTitle: hr.sectionTitle,
+        sectionSlug: hr.sectionSlug,
+        bookTitle: hr.bookTitle ?? hr.documentTitle,
+        bookNumber: hr.bookNumber ?? hr.documentId,
+        bookSlug: hr.bookSlug ?? hr.documentSlug,
+        chapterTitle: hr.chapterTitle ?? hr.sectionTitle,
+        chapterSlug: hr.chapterSlug ?? hr.sectionSlug,
         matchContext: hr.matchPassage,
         relevance: hr.relevance,
         score: hr.rrfScore,
@@ -60,6 +65,11 @@ export class LibrarySearchInteractor implements UseCase<SearchRequest, LibrarySe
 
       if (score > 0) {
         results.push({
+          documentTitle: book.title,
+          documentId: book.number,
+          documentSlug: book.slug,
+          sectionTitle: chapter.title,
+          sectionSlug: chapter.chapterSlug,
           bookTitle: book.title,
           bookNumber: book.number,
           bookSlug: book.slug,

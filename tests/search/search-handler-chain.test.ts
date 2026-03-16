@@ -17,7 +17,7 @@ import type { Book } from "@/core/entities/library";
 import { Chapter } from "@/core/entities/library";
 
 const mockBooks: Book[] = [
-  { slug: "book-1", title: "Book One", number: "1" },
+  { slug: "book-1", title: "Book One", number: "1", id: "1" },
 ];
 
 const mockChapters: Chapter[] = [
@@ -50,7 +50,7 @@ function makeMockEmbedder(ready: boolean): Embedder {
 function makeVectorRecord(id: string, content: string): EmbeddingRecord {
   return {
     id,
-    sourceType: "book_chunk",
+    sourceType: "document_chunk",
     sourceId: "book-1",
     chunkIndex: 0,
     chunkLevel: "passage",
@@ -61,9 +61,16 @@ function makeVectorRecord(id: string, content: string): EmbeddingRecord {
     modelVersion: "test",
     embedding: new Float32Array(384),
     metadata: {
-      sourceType: "book_chunk",
+      sourceType: "document_chunk",
+      documentTitle: "Book One",
+      documentId: "1",
+      documentSlug: "book-1",
+      sectionTitle: "Ch",
+      sectionSlug: "ch-1",
+      sectionFirstSentence: content,
       bookTitle: "Book One",
       bookSlug: "book-1",
+      bookNumber: "1",
       chapterTitle: "Ch",
       chapterSlug: "ch-1",
       chapterFirstSentence: content,
@@ -87,7 +94,7 @@ describe("SearchHandlerChain", () => {
   // TEST-VS-26
   it("embeddings table empty → BM25-only results via fallback", async () => {
     const bm25IndexStore = new InMemoryBM25IndexStore();
-    bm25IndexStore.saveIndex("book_chunk", {
+    bm25IndexStore.saveIndex("document_chunk", {
       avgDocLength: 10, docCount: 1,
       docLengths: new Map([["doc1", 10]]),
       termDocFrequencies: new Map([["bauhaus", 1]]),
@@ -101,8 +108,8 @@ describe("SearchHandlerChain", () => {
       makeVectorRecord("doc1", "The Bauhaus movement was important."),
     ]);
 
-    const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore);
-    const bm25 = new BM25SearchHandler(new BM25Scorer(), bm25IndexStore, vectorStore, bm25Processor);
+    const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore, "document_chunk");
+    const bm25 = new BM25SearchHandler(new BM25Scorer(), bm25IndexStore, vectorStore, bm25Processor, "document_chunk");
     const legacy = new LegacyKeywordHandler(makeMockRepo());
     const empty = new EmptyResultHandler();
 
@@ -118,7 +125,7 @@ describe("SearchHandlerChain", () => {
   // TEST-VS-27
   it("embedding model fails → BM25-only results via fallback", async () => {
     const bm25IndexStore = new InMemoryBM25IndexStore();
-    bm25IndexStore.saveIndex("book_chunk", {
+    bm25IndexStore.saveIndex("document_chunk", {
       avgDocLength: 10, docCount: 1,
       docLengths: new Map([["doc1", 10]]),
       termDocFrequencies: new Map([["bauhaus", 1]]),
@@ -132,8 +139,8 @@ describe("SearchHandlerChain", () => {
       makeVectorRecord("doc1", "The Bauhaus movement was important."),
     ]);
 
-    const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore);
-    const bm25 = new BM25SearchHandler(new BM25Scorer(), bm25IndexStore, vectorStore, bm25Processor);
+    const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore, "document_chunk");
+    const bm25 = new BM25SearchHandler(new BM25Scorer(), bm25IndexStore, vectorStore, bm25Processor, "document_chunk");
     const legacy = new LegacyKeywordHandler(makeMockRepo());
     const empty = new EmptyResultHandler();
 
@@ -153,8 +160,8 @@ describe("SearchHandlerChain", () => {
     const bm25Processor = new QueryProcessor([new LowercaseStep()]);
     const vectorStore = makeVectorStore([]);
 
-    const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore);
-    const bm25 = new BM25SearchHandler(new BM25Scorer(), bm25IndexStore, vectorStore, bm25Processor);
+    const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore, "document_chunk");
+    const bm25 = new BM25SearchHandler(new BM25Scorer(), bm25IndexStore, vectorStore, bm25Processor, "document_chunk");
     const legacy = new LegacyKeywordHandler(makeMockRepo());
     const empty = new EmptyResultHandler();
 
@@ -171,7 +178,7 @@ describe("SearchHandlerChain", () => {
   // TEST-VS-45
   it("chain delegates to BM25SearchHandler when embedder unavailable", async () => {
     const bm25IndexStore = new InMemoryBM25IndexStore();
-    bm25IndexStore.saveIndex("book_chunk", {
+    bm25IndexStore.saveIndex("document_chunk", {
       avgDocLength: 10, docCount: 1,
       docLengths: new Map([["doc1", 10]]),
       termDocFrequencies: new Map([["test", 1]]),
@@ -185,8 +192,8 @@ describe("SearchHandlerChain", () => {
       makeVectorRecord("doc1", "Test content for testing."),
     ]);
 
-    const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore);
-    const bm25 = new BM25SearchHandler(new BM25Scorer(), bm25IndexStore, vectorStore, bm25Processor);
+    const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore, "document_chunk");
+    const bm25 = new BM25SearchHandler(new BM25Scorer(), bm25IndexStore, vectorStore, bm25Processor, "document_chunk");
     const legacy = new LegacyKeywordHandler(makeMockRepo());
 
     hybrid.setNext(bm25);
@@ -207,8 +214,8 @@ describe("SearchHandlerChain", () => {
     const bm25Processor = new QueryProcessor([new LowercaseStep()]);
     const vectorStore = makeVectorStore([]);
 
-    const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore);
-    const bm25 = new BM25SearchHandler(new BM25Scorer(), bm25IndexStore, vectorStore, bm25Processor);
+    const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore, "document_chunk");
+    const bm25 = new BM25SearchHandler(new BM25Scorer(), bm25IndexStore, vectorStore, bm25Processor, "document_chunk");
     const legacy = new LegacyKeywordHandler(makeMockRepo());
     const empty = new EmptyResultHandler();
 

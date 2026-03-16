@@ -1,14 +1,15 @@
 #!/usr/bin/env tsx
 import { createHash } from "crypto";
 import { getDb } from "../src/lib/db";
-import { getBookRepository } from "../src/adapters/RepositoryFactory";
+import { getCorpusRepository } from "../src/adapters/RepositoryFactory";
 import { LocalEmbedder } from "../src/adapters/LocalEmbedder";
 import { SQLiteVectorStore } from "../src/adapters/SQLiteVectorStore";
 import { SQLiteBM25IndexStore } from "../src/adapters/SQLiteBM25IndexStore";
 import { EmbeddingPipelineFactory } from "../src/core/search/EmbeddingPipelineFactory";
 import { validateEmbeddingQuality } from "../src/core/search/EmbeddingValidator";
 import type { BM25Index } from "../src/core/search/ports/BM25IndexStore";
-import type { BookChunkMetadata } from "../src/core/search/ports/Chunker";
+import type { DocumentChunkMetadata } from "../src/core/search/ports/Chunker";
+import { corpusConfig } from "../src/lib/corpus-config";
 
 const MODEL_VERSION = "all-MiniLM-L6-v2@1.0";
 const force = process.argv.includes("--force");
@@ -39,15 +40,16 @@ async function main() {
     vectorStore,
     MODEL_VERSION,
   );
-  const pipeline = factory.createForSource("book_chunk");
+  const pipeline = factory.createForSource(corpusConfig.sourceType);
 
   // Load all books (for title lookup) and chapters
-  const bookRepo = getBookRepository();
+  const bookRepo = getCorpusRepository();
   const [books, chapters] = await Promise.all([
     bookRepo.getAllBooks(),
     bookRepo.getAllChapters(),
   ]);
   const bookTitleMap = new Map(books.map((b) => [b.slug, b.title]));
+  const bookIdMap = new Map(books.map((b) => [b.slug, b.id]));
 
   console.log(`Loading ${chapters.length} chapters from ${books.length} books...`);
 
@@ -65,17 +67,24 @@ async function main() {
     content: ch.content,
     contentHash: sha256(ch.content),
     metadata: {
-      sourceType: "book_chunk" as const,
+      sourceType: corpusConfig.sourceType,
+      documentSlug: ch.bookSlug,
+      sectionSlug: ch.chapterSlug,
+      documentTitle: bookTitleMap.get(ch.bookSlug) ?? ch.bookSlug,
+      documentId: bookIdMap.get(ch.bookSlug) ?? ch.bookSlug,
+      sectionTitle: ch.title,
+      sectionFirstSentence: ch.content.split(/[.!?]\s/)[0]?.slice(0, 200) ?? "",
       bookSlug: ch.bookSlug,
       chapterSlug: ch.chapterSlug,
       bookTitle: bookTitleMap.get(ch.bookSlug) ?? ch.bookSlug,
+      bookNumber: bookIdMap.get(ch.bookSlug) ?? ch.bookSlug,
       chapterTitle: ch.title,
       chapterFirstSentence: ch.content.split(/[.!?]\s/)[0]?.slice(0, 200) ?? "",
-    } satisfies BookChunkMetadata,
+    } satisfies DocumentChunkMetadata,
   }));
 
   // Run incremental rebuild
-  const result = await pipeline.rebuildAll("book_chunk", documents);
+  const result = await pipeline.rebuildAll(corpusConfig.sourceType, documents);
 
   console.log(`\nEmbedding Results:`);
   console.log(`  Chapters: ${chapters.length} (${result.created} new, ${result.updated} updated, ${result.unchanged} unchanged)`);
@@ -84,7 +93,7 @@ async function main() {
   console.log(`  Model:    ${MODEL_VERSION}`);
 
   // Rebuild BM25 index from all stored embeddings
-  const allRecords = vectorStore.getAll({ sourceType: "book_chunk" });
+  const allRecords = vectorStore.getAll({ sourceType: corpusConfig.sourceType });
   const docLengths = new Map<string, number>();
   const termDocFrequencies = new Map<string, number>();
   let totalLength = 0;
@@ -106,7 +115,7 @@ async function main() {
     docLengths,
     termDocFrequencies,
   };
-  bm25Store.saveIndex("book_chunk", bm25Index);
+  bm25Store.saveIndex(corpusConfig.sourceType, bm25Index);
   console.log(`  BM25:     ${bm25Index.docCount} docs, ${bm25Index.termDocFrequencies.size} terms`);
 
   // Validate embedding quality

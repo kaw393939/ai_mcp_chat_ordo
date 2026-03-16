@@ -1,20 +1,25 @@
-import type { Book, Chapter } from "../entities/library";
+import type {
+  CorpusQuery,
+  SectionQuery,
+} from "./CorpusRepository";
 
 export interface BookQuery {
-  getAllBooks(): Promise<Book[]>;
-  getBook(slug: string): Promise<Book | null>;
+  getAllBooks(): ReturnType<CorpusQuery["getAllDocuments"]>;
+  getBook(slug: string): ReturnType<CorpusQuery["getDocument"]>;
 }
 
 export interface ChapterQuery {
-  /**
-   * @throws {ResourceNotFoundError} if book is not found
-   */
-  getChaptersByBook(bookSlug: string): Promise<Chapter[]>;
-  getAllChapters(): Promise<Chapter[]>;
-  /**
-   * @throws {ResourceNotFoundError} if book or chapter is not found
-   */
-  getChapter(bookSlug: string, chapterSlug: string): Promise<Chapter>;
+  getChaptersByBook(bookSlug: string): ReturnType<SectionQuery["getSectionsByDocument"]>;
+  getAllChapters(): ReturnType<SectionQuery["getAllSections"]>;
+  getChapter(bookSlug: string, chapterSlug: string): ReturnType<SectionQuery["getSection"]>;
 }
 
-export interface BookRepository extends BookQuery, ChapterQuery {}
+export interface BookRepository extends BookQuery, ChapterQuery {
+  getAllDocuments?(): ReturnType<CorpusQuery["getAllDocuments"]>;
+  getDocument?(slug: string): ReturnType<CorpusQuery["getDocument"]>;
+  getSectionsByDocument?(documentSlug: string): ReturnType<SectionQuery["getSectionsByDocument"]>;
+  getAllSections?(): ReturnType<SectionQuery["getAllSections"]>;
+  getSection?(documentSlug: string, sectionSlug: string): ReturnType<SectionQuery["getSection"]>;
+}
+
+export type { CorpusQuery, SectionQuery };

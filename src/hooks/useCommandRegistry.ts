@@ -1,10 +1,10 @@
-import { useMemo } from "react";
+import { useCallback, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { useTheme } from "@/components/ThemeProvider";
-import { commandRegistry } from "@/core/commands/CommandRegistry";
 import { NavigationCommand } from "@/core/commands/NavigationCommands";
 import { ThemeCommand } from "@/core/commands/ThemeCommands";
 import type { Command } from "@/core/commands/Command";
+import type { MentionItem } from "@/core/entities/mentions";
 
 class PlaceholderCommand implements Command {
   constructor(
@@ -15,32 +15,66 @@ class PlaceholderCommand implements Command {
   execute() { /* no-op placeholder */ }
 }
 
-/**
- * Registers all application commands (navigation, themes, tools)
- * into the shared CommandRegistry singleton.
- */
+function toMentionItem(command: Command): MentionItem {
+  return {
+    id: command.id,
+    name: command.title,
+    category: "command",
+    description: command.category,
+  };
+}
+
 export function useCommandRegistry() {
   const router = useRouter();
   const { setTheme } = useTheme();
 
-  useMemo(() => {
+  const commands = useMemo(() => {
     const navigate = (path: string) => router.push(path);
 
-    // Navigation
-    commandRegistry.register(new NavigationCommand("library", "Go to Library", "Navigation", navigate, "/books"));
-    commandRegistry.register(new NavigationCommand("training", "Go to Training", "Navigation", navigate, "/training"));
-    commandRegistry.register(new NavigationCommand("studio", "Go to Studio", "Navigation", navigate, "/studio"));
-
-    // Themes
-    commandRegistry.register(new ThemeCommand("theme-fluid", "Set Theme: Fluid", "Themes", setTheme, "fluid"));
-    commandRegistry.register(new ThemeCommand("theme-swiss", "Set Theme: Swiss Grid", "Themes", setTheme, "swiss"));
-    commandRegistry.register(new ThemeCommand("theme-bauhaus", "Set Theme: Bauhaus", "Themes", setTheme, "bauhaus"));
-    commandRegistry.register(new ThemeCommand("theme-postmodern", "Set Theme: Postmodern", "Themes", setTheme, "postmodern"));
-    commandRegistry.register(new ThemeCommand("theme-skeuomorphic", "Set Theme: Skeuomorphic", "Themes", setTheme, "skeuomorphic"));
-
-    // Tools (placeholder commands)
-    commandRegistry.register(new PlaceholderCommand("search", "Search Library", "Tools"));
-    commandRegistry.register(new PlaceholderCommand("checklists", "Get Checklists", "Tools"));
-    commandRegistry.register(new PlaceholderCommand("practitioners", "List Practitioners", "Tools"));
+    return [
+      new NavigationCommand("library", "Go to Library", "Navigation", navigate, "/books"),
+      new NavigationCommand("training", "Go to Training", "Navigation", navigate, "/training"),
+      new NavigationCommand("studio", "Go to Studio", "Navigation", navigate, "/studio"),
+      new ThemeCommand("theme-fluid", "Set Theme: Fluid", "Themes", setTheme, "fluid"),
+      new ThemeCommand("theme-swiss", "Set Theme: Swiss Grid", "Themes", setTheme, "swiss"),
+      new ThemeCommand("theme-bauhaus", "Set Theme: Bauhaus", "Themes", setTheme, "bauhaus"),
+      new ThemeCommand("theme-postmodern", "Set Theme: Postmodern", "Themes", setTheme, "postmodern"),
+      new ThemeCommand("theme-skeuomorphic", "Set Theme: Skeuomorphic", "Themes", setTheme, "skeuomorphic"),
+      new PlaceholderCommand("search", "Search Library", "Tools"),
+      new PlaceholderCommand("checklists", "Get Checklists", "Tools"),
+      new PlaceholderCommand("practitioners", "List Practitioners", "Tools"),
+    ] satisfies Command[];
   }, [router, setTheme]);
+
+  const executeCommand = useCallback(
+    (commandId: string) => {
+      const command = commands.find((candidate) => candidate.id === commandId);
+      if (!command) {
+        return false;
+      }
+
+      command.execute();
+      return true;
+    },
+    [commands],
+  );
+
+  const findCommands = useCallback(
+    (query: string) => {
+      const normalizedQuery = query.toLowerCase();
+      return commands
+        .filter((command) =>
+          command.title.toLowerCase().includes(normalizedQuery) ||
+          command.category.toLowerCase().includes(normalizedQuery) ||
+          command.id.toLowerCase().includes(normalizedQuery),
+        )
+        .map(toMentionItem);
+    },
+    [commands],
+  );
+
+  return {
+    executeCommand,
+    findCommands,
+  };
 }

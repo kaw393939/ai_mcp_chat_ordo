@@ -16,6 +16,7 @@ const baseUser: User = {
 
 vi.mock("next/navigation", () => ({
   usePathname: () => pathname,
+  useRouter: () => ({ push: vi.fn() }),
 }));
 
 vi.mock("@/components/AccountMenu", () => ({
@@ -34,10 +35,7 @@ vi.mock("@/components/ThemeProvider", () => ({
 vi.mock("@/hooks/useGlobalChat", () => ({
   useGlobalChat: () => ({
     messages: [],
-    input: "",
     isSending: false,
-    canSend: false,
-    setInput: vi.fn(),
     sendMessage: vi.fn(),
     conversationId: null,
     isLoadingMessages: false,
@@ -67,7 +65,10 @@ vi.mock("@/hooks/useUICommands", () => ({
 }));
 
 vi.mock("@/hooks/useCommandRegistry", () => ({
-  useCommandRegistry: vi.fn(),
+  useCommandRegistry: vi.fn(() => ({
+    executeCommand: vi.fn(() => false),
+    findCommands: vi.fn(() => []),
+  })),
 }));
 
 vi.mock("@/frameworks/ui/ChatHeader", () => ({

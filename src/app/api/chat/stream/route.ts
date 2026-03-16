@@ -19,11 +19,32 @@ import { MessageLimitError } from "@/core/use-cases/ConversationInteractor";
 import { resolveUserId } from "@/lib/chat/resolve-user";
 import { buildContextWindow } from "@/lib/chat/context-window";
 import { buildSummaryContextBlock } from "@/lib/chat/summary-context";
+import { UserFileDataMapper } from "@/adapters/UserFileDataMapper";
+import { getDb } from "@/lib/db";
+import {
+  buildMessageContextText,
+  type AttachmentPart,
+} from "@/lib/chat/message-attachments";
+import { UserFileSystem } from "@/lib/user-files";
 
 type ChatMessage = {
   role: "user" | "assistant";
   content: string;
 };
+
+function isAttachmentCandidate(value: unknown): value is Omit<AttachmentPart, "type"> {
+  if (!value || typeof value !== "object") {
+    return false;
+  }
+
+  const candidate = value as Record<string, unknown>;
+  return (
+    typeof candidate.assetId === "string" &&
+    typeof candidate.fileName === "string" &&
+    typeof candidate.mimeType === "string" &&
+    typeof candidate.fileSize === "number"
+  );
+}
 
 // Formats for SSE
 function sseChunk(data: Record<string, unknown>): string {
@@ -52,8 +73,18 @@ export async function POST(request: NextRequest) {
       const body = (await request.json()) as {
         messages?: ChatMessage[];
         conversationId?: string;
+        attachments?: unknown[];
       };
       const incomingMessages = body.messages ?? [];
+      const incomingAttachments = (body.attachments ?? [])
+        .filter(isAttachmentCandidate)
+        .map((attachment) => ({
+          type: "attachment" as const,
+          assetId: attachment.assetId,
+          fileName: attachment.fileName,
+          mimeType: attachment.mimeType,
+          fileSize: attachment.fileSize,
+        }));
 
       if (!Array.isArray(incomingMessages) || incomingMessages.length === 0) {
         return errorJson(context, "messages must be a non-empty array.", 400);
@@ -63,19 +94,40 @@ export async function POST(request: NextRequest) {
         .reverse()
         .find((message) => message.role === "user")?.content;
 
-      if (!latestUserMessage) {
+      if (!latestUserMessage && incomingAttachments.length === 0) {
         return errorJson(context, "No user message found.", 400);
       }
 
+      const latestUserText = latestUserMessage ?? "";
+      const latestUserContent = buildMessageContextText(
+        latestUserText,
+        incomingAttachments,
+      );
+
       // All users persist (anonymous via cookie ID, authenticated via user.id)
       const interactor = getConversationInteractor();
+      const ufs = new UserFileSystem(new UserFileDataMapper(getDb()));
       let conversationId = body.conversationId || null;
 
       // Create conversation if needed
       if (!conversationId) {
-        const title = latestUserMessage.slice(0, 80);
+        const title = (latestUserText || incomingAttachments[0]?.fileName || "New conversation").slice(0, 80);
         const conv = await interactor.create(userId, title);
         conversationId = conv.id;
+      }
+
+      if (incomingAttachments.length > 0 && conversationId) {
+        const attachmentIds: string[] = [];
+
+        for (const attachment of incomingAttachments) {
+          const uploaded = await ufs.getById(attachment.assetId);
+          if (!uploaded || uploaded.file.userId !== userId) {
+            return errorJson(context, "Attachment not found.", 404);
+          }
+          attachmentIds.push(attachment.assetId);
+        }
+
+        await ufs.assignConversation(attachmentIds, userId, conversationId);
       }
 
       // Persist user message
@@ -84,8 +136,11 @@ export async function POST(request: NextRequest) {
           {
             conversationId,
             role: "user",
-            content: latestUserMessage,
-            parts: [{ type: "text", text: latestUserMessage }],
+            content: latestUserText,
+            parts: [
+              ...(latestUserText ? [{ type: "text" as const, text: latestUserText }] : []),
+              ...incomingAttachments,
+            ],
           },
           userId,
         );
@@ -105,9 +160,17 @@ export async function POST(request: NextRequest) {
         if (ctx.summaryText) {
           systemPrompt += buildSummaryContextBlock(ctx.summaryText);
         }
+      } else {
+        contextMessages = incomingMessages.map((message, index) => ({
+          role: message.role,
+          content:
+            index === incomingMessages.length - 1 && message.role === "user"
+              ? latestUserContent
+              : message.content,
+        }));
       }
 
-      if (looksLikeMath(latestUserMessage)) {
+      if (latestUserText && looksLikeMath(latestUserText)) {
         const mathResponse = await fetch(new URL("/api/chat", request.url), {
           method: "POST",
           headers: {

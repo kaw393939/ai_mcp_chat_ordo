@@ -97,6 +97,74 @@ export class UserFileDataMapper implements UserFileRepository {
     return rows.map(mapRow);
   }
 
+  async listUnattachedCreatedBefore(
+    cutoffIso: string,
+    options?: {
+      userId?: string;
+      fileType?: UserFile["fileType"];
+    },
+  ): Promise<UserFile[]> {
+    const conditions = [
+      `conversation_id IS NULL`,
+      `datetime(created_at) < datetime(?)`,
+    ];
+    const params: unknown[] = [cutoffIso];
+
+    if (options?.userId) {
+      conditions.push(`user_id = ?`);
+      params.push(options.userId);
+    }
+
+    if (options?.fileType) {
+      conditions.push(`file_type = ?`);
+      params.push(options.fileType);
+    }
+
+    const rows = this.db
+      .prepare(
+        `SELECT * FROM user_files
+         WHERE ${conditions.join(" AND ")}
+         ORDER BY created_at ASC`,
+      )
+      .all(...params) as UserFileRow[];
+
+    return rows.map(mapRow);
+  }
+
+  async assignConversation(
+    fileIds: string[],
+    userId: string,
+    conversationId: string,
+  ): Promise<void> {
+    if (fileIds.length === 0) {
+      return;
+    }
+
+    const placeholders = fileIds.map(() => "?").join(", ");
+    this.db
+      .prepare(
+        `UPDATE user_files
+         SET conversation_id = ?
+         WHERE user_id = ? AND id IN (${placeholders})`,
+      )
+      .run(conversationId, userId, ...fileIds);
+  }
+
+  async deleteIfUnattached(id: string, userId: string): Promise<UserFile | null> {
+    const row = this.db
+      .prepare(
+        `SELECT * FROM user_files WHERE id = ? AND user_id = ? AND conversation_id IS NULL`,
+      )
+      .get(id, userId) as UserFileRow | undefined;
+
+    if (!row) {
+      return null;
+    }
+
+    this.db.prepare(`DELETE FROM user_files WHERE id = ?`).run(id);
+    return mapRow(row);
+  }
+
   async delete(id: string): Promise<void> {
     this.db.prepare(`DELETE FROM user_files WHERE id = ?`).run(id);
   }

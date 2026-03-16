@@ -1,5 +1,9 @@
 import type { StreamEvent } from "../core/entities/chat-stream";
-import type { ChatStream, ChatStreamProvider } from "../core/use-cases/ChatStreamProvider";
+import type {
+  ChatStream,
+  ChatStreamProvider,
+  FetchChatStreamOptions,
+} from "../core/use-cases/ChatStreamProvider";
 import { 
   EventParser, 
   TextDeltaParser, 
@@ -16,11 +20,18 @@ export class ChatStreamAdapter implements ChatStreamProvider {
     new ConversationIdParser()
   ]);
 
-  async fetchStream(messages: { role: string; content: string }[], options?: { conversationId?: string }): Promise<ChatStream> {
+  async fetchStream(
+    messages: { role: string; content: string }[],
+    options?: FetchChatStreamOptions,
+  ): Promise<ChatStream> {
     const response = await fetch("/api/chat/stream", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ messages, conversationId: options?.conversationId }),
+      body: JSON.stringify({
+        messages,
+        conversationId: options?.conversationId,
+        attachments: options?.attachments,
+      }),
     });
 
     if (!response.ok) {

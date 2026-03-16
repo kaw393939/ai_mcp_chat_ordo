@@ -7,6 +7,21 @@ import {
   scrollElementTo,
 } from "@/lib/ui/browserSupport";
 
+const BOTTOM_THRESHOLD_PX = 32;
+
+function getPinnedScrollTop(element: HTMLDivElement): number {
+  return Math.max(element.scrollHeight - element.clientHeight, 0);
+}
+
+function pinToBottom(
+  element: HTMLDivElement,
+  behavior: ScrollBehavior,
+): boolean {
+  scrollElementTo(element, getPinnedScrollTop(element), behavior);
+  const { scrollTop, scrollHeight, clientHeight } = element;
+  return scrollHeight - scrollTop - clientHeight <= BOTTOM_THRESHOLD_PX;
+}
+
 export function useChatScroll<T>(dep: T): {
   scrollRef: RefObject<HTMLDivElement | null>;
   isAtBottom: boolean;
@@ -15,59 +30,69 @@ export function useChatScroll<T>(dep: T): {
 } {
   const scrollRef = useRef<HTMLDivElement>(null);
   const [isAtBottom, setIsAtBottom] = useState(true);
-  // Track whether the user deliberately scrolled away from the bottom
-  const userScrolledUp = useRef(false);
-  const prevScrollTop = useRef(0);
+  const pinnedToBottom = useRef(true);
 
   const checkIfAtBottom = useCallback(() => {
     if (!scrollRef.current) return true;
     const { scrollTop, scrollHeight, clientHeight } = scrollRef.current;
-    return scrollHeight - scrollTop - clientHeight < 150;
+    return scrollHeight - scrollTop - clientHeight <= BOTTOM_THRESHOLD_PX;
   }, []);
 
   const handleScroll = useCallback(() => {
     if (!scrollRef.current) return;
 
-    const { scrollTop } = scrollRef.current;
     const atBottom = checkIfAtBottom();
-
-    // Detect deliberate upward scroll (scrollTop decreased by more than a small threshold)
-    if (scrollTop < prevScrollTop.current - 10) {
-      userScrolledUp.current = true;
-    }
-
-    // Reset when user reaches the bottom again
-    if (atBottom) {
-      userScrolledUp.current = false;
-    }
-
-    prevScrollTop.current = scrollTop;
+    pinnedToBottom.current = atBottom;
     setIsAtBottom(atBottom);
   }, [checkIfAtBottom]);
 
   const scrollToBottom = useCallback((behavior: ScrollBehavior = getUserScrollBehavior()) => {
     if (scrollRef.current) {
-      scrollElementTo(scrollRef.current, scrollRef.current.scrollHeight, behavior);
-      userScrolledUp.current = false;
+      pinToBottom(scrollRef.current, behavior);
+      pinnedToBottom.current = true;
       setIsAtBottom(true);
     }
   }, []);
 
-  // Auto-scroll when content changes, unless the user deliberately scrolled up
   useEffect(() => {
-    if (userScrolledUp.current) return;
+    if (typeof ResizeObserver === "undefined") {
+      return;
+    }
+
+    const viewport = scrollRef.current;
+    const content = viewport?.firstElementChild;
+    if (!viewport || !(content instanceof HTMLElement)) {
+      return;
+    }
+
+    const observer = new ResizeObserver(() => {
+      if (!pinnedToBottom.current || !scrollRef.current) {
+        return;
+      }
+
+      const atBottom = pinToBottom(scrollRef.current, getAutoScrollBehavior());
+      pinnedToBottom.current = atBottom;
+      setIsAtBottom(atBottom);
+    });
+
+    observer.observe(content);
+    return () => {
+      observer.disconnect();
+    };
+  }, [dep]);
+
+  useEffect(() => {
+    if (!pinnedToBottom.current) return;
 
     const cleanup = scheduleAfterPaint(() => {
       if (scrollRef.current) {
-        scrollElementTo(
-          scrollRef.current,
-          scrollRef.current.scrollHeight,
-          getAutoScrollBehavior(),
-        );
+        const atBottom = pinToBottom(scrollRef.current, getAutoScrollBehavior());
+        pinnedToBottom.current = atBottom;
+        setIsAtBottom(atBottom);
       }
     });
     return cleanup;
-  }, [dep]);
+  }, [checkIfAtBottom, dep]);
 
   return { scrollRef, isAtBottom, scrollToBottom, handleScroll };
 }

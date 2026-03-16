@@ -22,8 +22,8 @@ export class MessageFactory {
     };
   }
 
-  static createUserMessage(content: string): ChatMessage {
-    return this.create("user", content);
+  static createUserMessage(content: string, parts?: MessagePart[]): ChatMessage {
+    return this.create("user", content, parts ?? (content ? [{ type: "text", text: content }] : []));
   }
 
   static createAssistantMessage(content: string = "", parts: MessagePart[] = []): ChatMessage {

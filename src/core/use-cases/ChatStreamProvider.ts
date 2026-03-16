@@ -10,6 +10,20 @@ export interface ChatStream {
   events(): AsyncIterableIterator<StreamEvent>;
   cancel(): void;
 }
+
+export interface FetchChatStreamOptions {
+  conversationId?: string;
+  attachments?: Array<{
+    assetId: string;
+    fileName: string;
+    mimeType: string;
+    fileSize: number;
+  }>;
+}
+
 export interface ChatStreamProvider {
-  fetchStream(messages: { role: string; content: string }[], options?: { conversationId?: string }): Promise<ChatStream>;
+  fetchStream(
+    messages: { role: string; content: string }[],
+    options?: FetchChatStreamOptions,
+  ): Promise<ChatStream>;
 }

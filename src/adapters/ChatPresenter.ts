@@ -4,6 +4,7 @@ import type { RichContent } from "../core/entities/rich-content";
 import type { UICommand } from "../core/entities/ui-command";
 import { UI_COMMAND_TYPE } from "../core/entities/ui-command";
 import { BLOCK_TYPES } from "../core/entities/rich-content";
+import { getAttachmentParts, type AttachmentPart } from "@/lib/chat/message-attachments";
 import type { MarkdownParserService } from "./MarkdownParserService";
 import type { CommandParserService } from "./CommandParserService";
 
@@ -25,6 +26,7 @@ export interface PresentedMessage {
   rawContent: string;
   commands: UICommand[];
   suggestions: string[];
+  attachments: AttachmentPart[];
   timestamp: string;
 }
 
@@ -53,6 +55,7 @@ export class ChatPresenter {
 
     const richContent = this.markdownParser.parse(textContent);
     const commands = this.commandParser.parse(textContent);
+  const attachments = getAttachmentParts(message.parts);
 
     // Map AI tool calls to UI commands
     const toolCalls = extractToolCalls(message.parts);
@@ -104,12 +107,13 @@ export class ChatPresenter {
     }
 
     return {
-      id: message.id || Math.random().toString(),
+      id: message.id,
       role: message.role,
       content: richContent,
       rawContent: textContent,
       commands: commands,
       suggestions: suggestions,
+      attachments,
       timestamp: (message.timestamp || new Date()).toLocaleTimeString([], {
         hour: "2-digit",
         minute: "2-digit",

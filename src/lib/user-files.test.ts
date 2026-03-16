@@ -19,7 +19,12 @@ const tmpBase = vi.hoisted(() => {
 import Database from "better-sqlite3";
 import { ensureSchema } from "./db/schema";
 import { UserFileDataMapper } from "../adapters/UserFileDataMapper";
-import { UserFileSystem, contentHash, getUserFilePath } from "./user-files";
+import {
+  CHAT_UPLOAD_REAPER_TTL_MINUTES,
+  UserFileSystem,
+  contentHash,
+  getUserFilePath,
+} from "./user-files";
 
 afterAll(() => {
   process.cwd = tmpBase.origCwd;
@@ -40,6 +45,13 @@ function seedUser(db: Database.Database, id = "usr_test") {
   db.prepare(
     `INSERT OR IGNORE INTO user_roles (user_id, role_id) VALUES (?, 'role_authenticated')`,
   ).run(id);
+}
+
+function seedConversation(db: Database.Database, id = "conv_1", userId = "usr_test") {
+  db.prepare(
+    `INSERT OR IGNORE INTO conversations (id, user_id, title, status, session_source)
+     VALUES (?, ?, 'Test Conversation', 'active', 'authenticated')`,
+  ).run(id, userId);
 }
 
 describe("contentHash", () => {
@@ -203,5 +215,97 @@ describe("UserFileSystem", () => {
     const cached = await ufs.lookup("usr_test", "Same text", "audio");
     expect(cached).not.toBeNull();
     expect(cached?.file.id).toBe(file1.id);
+  });
+
+  it("deleteIfUnattached() removes unattached file records and disk content", async () => {
+    const data = Buffer.from("temporary file");
+    const stored = await ufs.storeBinary({
+      userId: "usr_test",
+      conversationId: null,
+      fileType: "document",
+      mimeType: "text/plain",
+      extension: "txt",
+      data,
+    });
+
+    const deleted = await ufs.deleteIfUnattached(stored.id, "usr_test");
+
+    expect(deleted).toBe(true);
+    expect(fs.existsSync(getUserFilePath("usr_test", stored.fileName))).toBe(false);
+    expect(await ufs.getById(stored.id)).toBeNull();
+  });
+
+  it("deleteIfUnattached() preserves files already linked to a conversation", async () => {
+    seedConversation(db);
+
+    const data = Buffer.from("linked file");
+    const stored = await ufs.storeBinary({
+      userId: "usr_test",
+      conversationId: "conv_1",
+      fileType: "document",
+      mimeType: "text/plain",
+      extension: "txt",
+      data,
+    });
+
+    const deleted = await ufs.deleteIfUnattached(stored.id, "usr_test");
+
+    expect(deleted).toBe(false);
+    expect(await ufs.getById(stored.id)).not.toBeNull();
+  });
+
+  it("reapUnattachedFiles() removes only stale unattached files that match the requested type", async () => {
+    seedConversation(db);
+
+    const staleDocument = await ufs.storeBinary({
+      userId: "usr_test",
+      conversationId: null,
+      fileType: "document",
+      mimeType: "text/plain",
+      extension: "txt",
+      data: Buffer.from("stale document"),
+    });
+    const recentDocument = await ufs.storeBinary({
+      userId: "usr_test",
+      conversationId: null,
+      fileType: "document",
+      mimeType: "text/plain",
+      extension: "txt",
+      data: Buffer.from("recent document"),
+    });
+    const staleAudio = await ufs.store({
+      userId: "usr_test",
+      conversationId: null,
+      input: "stale audio",
+      fileType: "audio",
+      mimeType: "audio/mpeg",
+      extension: "mp3",
+      data: Buffer.from("audio bytes"),
+    });
+    const attachedDocument = await ufs.storeBinary({
+      userId: "usr_test",
+      conversationId: "conv_1",
+      fileType: "document",
+      mimeType: "text/plain",
+      extension: "txt",
+      data: Buffer.from("attached document"),
+    });
+
+    db.prepare(
+      `UPDATE user_files SET created_at = '2000-01-01 00:00:00' WHERE id IN (?, ?)`,
+    ).run(staleDocument.id, staleAudio.id);
+
+    const deletedIds = await ufs.reapUnattachedFiles({
+      olderThanMinutes: CHAT_UPLOAD_REAPER_TTL_MINUTES,
+      userId: "usr_test",
+      fileType: "document",
+    });
+
+    expect(deletedIds).toEqual([staleDocument.id]);
+    expect(await ufs.getById(staleDocument.id)).toBeNull();
+    expect(await ufs.getById(recentDocument.id)).not.toBeNull();
+    expect(await ufs.getById(staleAudio.id)).not.toBeNull();
+    expect(await ufs.getById(attachedDocument.id)).not.toBeNull();
+    expect(fs.existsSync(getUserFilePath("usr_test", staleDocument.fileName))).toBe(false);
   });
 });

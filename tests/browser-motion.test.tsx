@@ -91,7 +91,10 @@ vi.mock("@/hooks/useUICommands", () => ({
 }));
 
 vi.mock("@/hooks/useCommandRegistry", () => ({
-  useCommandRegistry: vi.fn(),
+  useCommandRegistry: vi.fn(() => ({
+    executeCommand: vi.fn(() => false),
+    findCommands: vi.fn(() => []),
+  })),
 }));
 
 vi.mock("@/frameworks/ui/ChatHeader", () => ({

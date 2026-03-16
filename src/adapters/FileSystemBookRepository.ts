@@ -112,6 +112,7 @@ export class FileSystemBookRepository implements BookRepository {
       slug: b.slug,
       title: b.title,
       number: b.number,
+      id: b.number,
     }));
   }
 
@@ -123,7 +124,16 @@ export class FileSystemBookRepository implements BookRepository {
       slug: book.slug,
       title: book.title,
       number: book.number,
+      id: book.number,
     };
+  }
+
+  async getAllDocuments(): Promise<Book[]> {
+    return this.getAllBooks();
+  }
+
+  async getDocument(slug: string): Promise<Book | null> {
+    return this.getBook(slug);
   }
 
   async getChaptersByBook(bookSlug: string): Promise<Chapter[]> {
@@ -162,6 +172,14 @@ export class FileSystemBookRepository implements BookRepository {
     return allChapters;
   }
 
+  async getSectionsByDocument(documentSlug: string): Promise<Chapter[]> {
+    return this.getChaptersByBook(documentSlug);
+  }
+
+  async getAllSections(): Promise<Chapter[]> {
+    return this.getAllChapters();
+  }
+
   async getChapter(
     bookSlug: string,
     chapterSlug: string,
@@ -183,6 +201,10 @@ export class FileSystemBookRepository implements BookRepository {
     } catch {
       throw new ResourceNotFoundError(`Chapter not found: ${chapterSlug}`);
     }
+  }
+
+  async getSection(documentSlug: string, sectionSlug: string): Promise<Chapter> {
+    return this.getChapter(documentSlug, sectionSlug);
   }
 
   private parseChapter(

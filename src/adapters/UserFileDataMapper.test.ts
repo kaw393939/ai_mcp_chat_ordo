@@ -226,4 +226,70 @@ describe("UserFileDataMapper", () => {
     expect(file.conversationId).toBeNull();
     expect(file.fileType).toBe("document");
   });
+
+  it("listUnattachedCreatedBefore returns only stale unattached files that match the filters", async () => {
+    seedUser(db, "usr_other");
+
+    await mapper.create({
+      id: "uf_stale_doc",
+      userId: "usr_test",
+      conversationId: null,
+      contentHash: "stale-doc",
+      fileType: "document",
+      fileName: "stale-doc.txt",
+      mimeType: "text/plain",
+      fileSize: 10,
+    });
+    await mapper.create({
+      id: "uf_recent_doc",
+      userId: "usr_test",
+      conversationId: null,
+      contentHash: "recent-doc",
+      fileType: "document",
+      fileName: "recent-doc.txt",
+      mimeType: "text/plain",
+      fileSize: 10,
+    });
+    await mapper.create({
+      id: "uf_stale_audio",
+      userId: "usr_test",
+      conversationId: null,
+      contentHash: "stale-audio",
+      fileType: "audio",
+      fileName: "stale-audio.mp3",
+      mimeType: "audio/mpeg",
+      fileSize: 10,
+    });
+    await mapper.create({
+      id: "uf_attached_doc",
+      userId: "usr_test",
+      conversationId: "conv_1",
+      contentHash: "attached-doc",
+      fileType: "document",
+      fileName: "attached-doc.txt",
+      mimeType: "text/plain",
+      fileSize: 10,
+    });
+    await mapper.create({
+      id: "uf_other_user",
+      userId: "usr_other",
+      conversationId: null,
+      contentHash: "other-user",
+      fileType: "document",
+      fileName: "other-user.txt",
+      mimeType: "text/plain",
+      fileSize: 10,
+    });
+
+    db.prepare(
+      `UPDATE user_files SET created_at = '2000-01-01 00:00:00' WHERE id IN ('uf_stale_doc', 'uf_stale_audio', 'uf_other_user')`,
+    ).run();
+
+    const staleDocs = await mapper.listUnattachedCreatedBefore(
+      new Date("2026-03-15T00:00:00.000Z").toISOString(),
+      { userId: "usr_test", fileType: "document" },
+    );
+
+    expect(staleDocs.map((file) => file.id)).toEqual(["uf_stale_doc"]);
+  });
 });

@@ -7,6 +7,7 @@ Ordo is a production-style Next.js application used to teach AI product engineer
 - How an LLM-backed app stays grounded through tools, retrieval, RBAC, and deterministic checks.
 - How MCP servers and application tools fit together in a real Next.js system.
 - How to break large work into specs, implementation sprints, QA passes, and runtime verification.
+- canonical corpus tools such as `search_corpus`, `get_section`, and `get_corpus_summary`
 - How to control common LLM failure modes such as hallucination, drift, false confidence, and context loss.
 - How to use automated tests and operational scripts to keep agentic work honest.
 

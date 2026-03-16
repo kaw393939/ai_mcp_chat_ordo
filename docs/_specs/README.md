@@ -39,6 +39,8 @@ docs/_specs/
 | [Conversation Memory](conversation-memory/) | **Draft** | 3 (0–2) | Anonymous persistence, auto-resume, rolling summaries, conversation search |
 | [Browser UI Hardening](browser-ui-hardening/) | **Draft** | 7 (0–6) | Cross-browser shell, overlay, motion, media, and regression hardening for Safari, Chrome, Firefox, and mobile browsers |
 | [Homepage Chat Shell](homepage-chat-shell/) | **Draft** | 4 (0–3) | Homepage-first chat stage architecture with below-the-fold footer, exclusive message scrolling, and pinned composer behavior |
+| [Chat Experience](chat-experience/) | **In Progress** | 3 (0–2) | Message semantics, inline navigation, composer ergonomics, scroll intent, and calmer conversation presentation |
+| [Chat Runtime Hardening](chat-runtime-hardening/) | **Complete** | 4 (0–3) | Documentation alignment, local command dependencies, stale attachment reaping, and failed-send regression coverage for the chat runtime |
 
 ### Roadmap
 

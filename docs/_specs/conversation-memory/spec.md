@@ -35,8 +35,9 @@
 > Sprint tasks reference these IDs for traceability.
 > **Implementation update (2026-03-15):** The active conversation restore
 > flow, anonymous persistence path, anonymous-to-authenticated migration
-> wiring, conversation-index ownership repair, and summary-context prompt
-> assembly have all been implemented. This spec now reflects those concrete
+> wiring, conversation-index ownership repair, summary-context prompt
+> assembly, system-prompt management, and conversation analytics MCP tools
+> have all been implemented. This spec now reflects those concrete
 > behaviors while preserving the remaining roadmap items.
 
 ---
@@ -91,13 +92,14 @@
   created, activated, diffed, and rolled back through MCP prompt tools, while
   hardcoded strings remain only as fallbacks and seeds. `[CONVO-060]`
 
-7. **Zero conversation analytics** — the system emits structured logs to
-   stdout (`src/lib/observability/`) but stores no persistent metrics.
-   `getMetricsSnapshot()` returns `{ mode: "externalized" }`. There are
-   no queries for: how many anonymous sessions occur, how long they last,
-   which tools drive engagement, what the anonymous-to-authenticated
-   conversion rate is, or where users drop off. Admins are blind to how
-   the system performs as a conversion funnel. `[CONVO-070]`
+7. **Resolved: conversation analytics now exist as admin MCP tools** —
+  `conversation_analytics`, `conversation_inspect`, and
+  `conversation_cohort` are now implemented in `mcp/analytics-tool.ts`
+  and registered in `mcp/embedding-server.ts`. They query the
+  `conversation_events`, `conversations`, and `messages` tables to
+  expose overview, funnel, engagement, tool-usage, drop-off, and
+  cohort-comparison views without adding a dedicated dashboard UI.
+  `[CONVO-070]`
 
 8. **Resolved: anonymous → authenticated conversion now preserves search
    ownership** — registration migrates conversations from `anon_{uuid}` to
@@ -106,18 +108,14 @@
    authenticated owner prefix. A repair script exists for any previously
    migrated rows that predate the fix. `[CONVO-080]`
 
-9. **Domain-specific naming saturates the core layer** — the architecture
-   follows Clean Architecture correctly (`src/core/` never imports from
-   `src/lib/` or `src/app/`), but entity names, repository interfaces,
-   and search types are coupled to the current book-library domain:
-   `BookChunkMetadata`, `BookRepository`, `BookQuery`, `ChapterQuery`,
-   `Book`, `Chapter`, `Checklist`, `Practitioner` all live in
-   `src/core/`. The `HybridSearchEngine` defaults to `"book_chunk"`
-   source type. Tool descriptions hardcode "10 books (104 chapters)".
-   The `BASE_PROMPT` embeds corpus-specific context. This means
-   re-deploying the system for a different domain (legal, healthcare,
-   education) requires renaming ~40% of the core layer rather than just
-   swapping configuration and content. `[CONVO-090]`
+9. **Addressed in Sprint 5: the core layer is now corpus-first** — the
+  runtime now uses canonical `Document`/`Section`/`CorpusRepository`
+  concepts, `DocumentChunkMetadata`, config-driven tool descriptions,
+  prompt seeds from `buildCorpusBasePrompt()`, and the generic
+  `document_chunk` source type. Legacy book/chapter names remain as
+  compatibility aliases so the reference-product shell and older tests
+  keep working while the public kernel surface stays domain-agnostic.
+  `[CONVO-090]`
 
 ### 1.2 Core Insight
 
@@ -464,7 +462,7 @@ constructor(
   private vectorStore: VectorStore,
   private modelVersion: string,
 )
-createForSource(sourceType: "book_chunk" | "conversation"): EmbeddingPipeline
+createForSource(sourceType: string): EmbeddingPipeline
 // "conversation" case: uses ConversationChunker
 
 // EmbeddingPipeline (src/core/search/EmbeddingPipeline.ts)
@@ -1310,7 +1308,7 @@ When a conversation passage mentions content from the library (detected
 by overlapping terms with book chunk headings), the search result can
 include related chapter references. This is a quality-of-life enhancement
 deferred to the sprint doc for Sprint 2 — it may be as simple as running
-a secondary search on the matching passage against `sourceType = "book_chunk"`.
+a secondary search on the matching passage against `sourceType = "document_chunk"`.
 
 ---
 

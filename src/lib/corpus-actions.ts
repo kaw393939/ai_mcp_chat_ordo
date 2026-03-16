@@ -1,0 +1,1 @@
+export { getChapter as getSectionContentAction } from "./book-actions";

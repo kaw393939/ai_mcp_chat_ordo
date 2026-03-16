@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import fs from "fs";
-import { getSessionUser } from "@/lib/auth";
+import { resolveUserId } from "@/lib/chat/resolve-user";
 import { getDb } from "@/lib/db";
 import { UserFileDataMapper } from "@/adapters/UserFileDataMapper";
 import { UserFileSystem } from "@/lib/user-files";
@@ -10,10 +10,7 @@ export async function GET(
   { params }: { params: Promise<{ id: string }> },
 ) {
   try {
-    const user = await getSessionUser();
-    if (user.roles[0] === "ANONYMOUS") {
-      return NextResponse.json({ error: "Authentication required" }, { status: 403 });
-    }
+    const { userId } = await resolveUserId();
 
     const { id } = await params;
     const repo = new UserFileDataMapper(getDb());
@@ -25,7 +22,7 @@ export async function GET(
     }
 
     // Ensure the requesting user owns this file
-    if (result.file.userId !== user.id) {
+    if (result.file.userId !== userId) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 

@@ -14,13 +14,15 @@ export function highlightTerms(passage: string, queryTerms: string[]): string {
   return passage.replace(pattern, "**$1**");
 }
 
-export function deduplicateByChapter(
+export function deduplicateBySection(
   results: HybridSearchResult[],
 ): HybridSearchResult[] {
   const seen = new Map<string, HybridSearchResult>();
 
   for (const result of results) {
-    const key = `${result.bookSlug}::${result.chapterSlug}`;
+    const documentSlug = result.documentSlug ?? result.bookSlug ?? "";
+    const sectionSlug = result.sectionSlug ?? result.chapterSlug ?? "";
+    const key = `${documentSlug}::${sectionSlug}`;
     const existing = seen.get(key);
     if (!existing || result.rrfScore > existing.rrfScore) {
       seen.set(key, result);
@@ -29,6 +31,8 @@ export function deduplicateByChapter(
 
   return [...seen.values()].sort((a, b) => b.rrfScore - a.rrfScore);
 }
+
+export const deduplicateByChapter = deduplicateBySection;
 
 export function assignRelevance(
   rrfScore: number,

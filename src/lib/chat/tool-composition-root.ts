@@ -3,7 +3,7 @@ import { composeMiddleware, type ToolExecuteFn } from "@/core/tool-registry/Tool
 import { LoggingMiddleware } from "@/core/tool-registry/LoggingMiddleware";
 import { RbacGuardMiddleware } from "@/core/tool-registry/RbacGuardMiddleware";
 import { RoleAwareSearchFormatter } from "@/core/tool-registry/ToolResultFormatter";
-import { getBookRepository } from "@/adapters/RepositoryFactory";
+import { getCorpusRepository } from "@/adapters/RepositoryFactory";
 import type { BookRepository } from "@/core/use-cases/BookRepository";
 
 import { LocalEmbedder } from "@/adapters/LocalEmbedder";
@@ -34,13 +34,14 @@ import { adjustUiTool } from "@/core/use-cases/tools/adjust-ui.tool";
 import { navigateTool } from "@/core/use-cases/tools/navigate.tool";
 import { generateChartTool } from "@/core/use-cases/tools/generate-chart.tool";
 import { generateAudioTool } from "@/core/use-cases/tools/generate-audio.tool";
-import { createSearchBooksTool } from "@/core/use-cases/tools/search-books.tool";
-import { createGetChapterTool } from "@/core/use-cases/tools/get-chapter.tool";
+import { createSearchCorpusTool } from "@/core/use-cases/tools/search-corpus.tool";
+import { createGetSectionTool } from "@/core/use-cases/tools/get-section.tool";
 import { createGetChecklistTool } from "@/core/use-cases/tools/get-checklist.tool";
 import { createListPractitionersTool } from "@/core/use-cases/tools/list-practitioners.tool";
-import { createGetBookSummaryTool } from "@/core/use-cases/tools/get-book-summary.tool";
+import { createGetCorpusSummaryTool } from "@/core/use-cases/tools/get-corpus-summary.tool";
 import { createAdminWebSearchTool } from "@/core/use-cases/tools/admin-web-search.tool";
 import { createSearchMyConversationsTool } from "@/core/use-cases/tools/search-my-conversations.tool";
+import { corpusConfig } from "@/lib/corpus-config";
 
 let registry: ToolRegistry | null = null;
 let composedExecute: ToolExecuteFn | null = null;
@@ -60,12 +61,13 @@ export function createToolRegistry(bookRepo: BookRepository, handler?: SearchHan
   reg.register(generateChartTool);
   reg.register(generateAudioTool);
 
-  // Book tools (need BookRepository)
-  reg.register(createSearchBooksTool(bookRepo, handler));
-  reg.register(createGetChapterTool(bookRepo));
+  // Canonical corpus tools
+  reg.register(createSearchCorpusTool(bookRepo, handler));
+  reg.register(createGetSectionTool(bookRepo));
+  reg.register(createGetCorpusSummaryTool(bookRepo));
+
   reg.register(createGetChecklistTool(bookRepo));
   reg.register(createListPractitionersTool(bookRepo));
-  reg.register(createGetBookSummaryTool(bookRepo));
 
   // Conversation search (authenticated+ only)
   const db = getDb();
@@ -81,7 +83,7 @@ export function createToolRegistry(bookRepo: BookRepository, handler?: SearchHan
 
 export function getToolRegistry(): ToolRegistry {
   if (!registry) {
-    registry = createToolRegistry(getBookRepository(), getSearchHandler());
+    registry = createToolRegistry(getCorpusRepository(), getSearchHandler());
   }
   return registry;
 }
@@ -109,7 +111,11 @@ export function getEmbeddingPipelineFactory(): EmbeddingPipelineFactory {
 }
 
 export function getBookPipeline(): EmbeddingPipeline {
-  return getEmbeddingPipelineFactory().createForSource("book_chunk");
+  return getEmbeddingPipelineFactory().createForSource(corpusConfig.sourceType);
+}
+
+export function getCorpusPipeline(): EmbeddingPipeline {
+  return getEmbeddingPipelineFactory().createForSource(corpusConfig.sourceType);
 }
 
 export function getSearchHandler(): SearchHandler {
@@ -136,9 +142,9 @@ export function getSearchHandler(): SearchHandler {
       { vectorTopN: 50, bm25TopN: 50, rrfK: 60, maxResults: 10 },
     );
 
-    const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore);
-    const bm25 = new BM25SearchHandler(bm25Scorer, bm25IndexStore, vectorStore, bm25Processor);
-    const legacy = new LegacyKeywordHandler(getBookRepository());
+    const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore, corpusConfig.sourceType);
+    const bm25 = new BM25SearchHandler(bm25Scorer, bm25IndexStore, vectorStore, bm25Processor, corpusConfig.sourceType);
+    const legacy = new LegacyKeywordHandler(getCorpusRepository());
     const empty = new EmptyResultHandler();
 
     hybrid.setNext(bm25);

@@ -1,6 +1,7 @@
 import type { BookRepository } from "../core/use-cases/BookRepository";
-import { FileSystemBookRepository } from "./FileSystemBookRepository";
-import { CachedBookRepository } from "./CachedBookRepository";
+import type { CorpusRepository } from "../core/use-cases/CorpusRepository";
+import { FileSystemCorpusRepository } from "./FileSystemCorpusRepository";
+import { CachedCorpusRepository } from "./CachedCorpusRepository";
 
 /**
  * Repository Factory
@@ -9,13 +10,17 @@ import { CachedBookRepository } from "./CachedBookRepository";
  * This facilitates the Dependency Inversion Principle (DIP).
  */
 
-let repository: BookRepository | null = null;
+let repository: (BookRepository & CorpusRepository) | null = null;
 
-export function getBookRepository(): BookRepository {
+export function getCorpusRepository(): BookRepository & CorpusRepository {
   if (!repository) {
-    // In a multi-environment setup, we would check ENV here 
+    // In a multi-environment setup, we would check ENV here
     // to return a MockRepository or a CloudRepository.
-    repository = new CachedBookRepository(new FileSystemBookRepository());
+    repository = new CachedCorpusRepository(new FileSystemCorpusRepository());
   }
   return repository;
+}
+
+export function getBookRepository(): BookRepository {
+  return getCorpusRepository();
 }

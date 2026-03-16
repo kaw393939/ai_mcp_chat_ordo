@@ -14,6 +14,12 @@ export function contentHash(input: string): string {
   return crypto.createHash("sha256").update(input).digest("hex").slice(0, 32);
 }
 
+export function binaryContentHash(data: Buffer): string {
+  return crypto.createHash("sha256").update(data).digest("hex").slice(0, 32);
+}
+
+export const CHAT_UPLOAD_REAPER_TTL_MINUTES = 60;
+
 export class UserFileSystem {
   constructor(private repo: UserFileRepository) {}
 
@@ -76,6 +82,106 @@ export class UserFileSystem {
       mimeType: params.mimeType,
       fileSize: params.data.length,
     });
+  }
+
+  async storeBinary(params: {
+    userId: string;
+    conversationId: string | null;
+    fileType: UserFile["fileType"];
+    mimeType: string;
+    extension: string;
+    data: Buffer;
+  }): Promise<UserFile> {
+    const hash = binaryContentHash(params.data);
+    const fileName = `${hash}.${params.extension}`;
+    const diskPath = getUserFilePath(params.userId, fileName);
+
+    const dir = path.dirname(diskPath);
+    if (!fs.existsSync(dir)) {
+      fs.mkdirSync(dir, { recursive: true });
+    }
+
+    if (!fs.existsSync(diskPath)) {
+      fs.writeFileSync(diskPath, params.data);
+    }
+
+    const existing = await this.repo.findByHash(
+      params.userId,
+      hash,
+      params.fileType,
+    );
+    if (existing) {
+      return existing;
+    }
+
+    const id = `uf_${crypto.randomUUID()}`;
+    return this.repo.create({
+      id,
+      userId: params.userId,
+      conversationId: params.conversationId,
+      contentHash: hash,
+      fileType: params.fileType,
+      fileName,
+      mimeType: params.mimeType,
+      fileSize: params.data.length,
+    });
+  }
+
+  async assignConversation(
+    fileIds: string[],
+    userId: string,
+    conversationId: string,
+  ): Promise<void> {
+    await this.repo.assignConversation(fileIds, userId, conversationId);
+  }
+
+  async deleteIfUnattached(id: string, userId: string): Promise<boolean> {
+    const file = await this.repo.deleteIfUnattached(id, userId);
+    if (!file) {
+      return false;
+    }
+
+    const diskPath = getUserFilePath(file.userId, file.fileName);
+    if (fs.existsSync(diskPath)) {
+      fs.unlinkSync(diskPath);
+    }
+
+    return true;
+  }
+
+  async reapUnattachedFiles(options: {
+    olderThanMinutes?: number;
+    userId?: string;
+    fileType?: UserFile["fileType"];
+  }): Promise<string[]> {
+    const olderThanMinutes =
+      options.olderThanMinutes ?? CHAT_UPLOAD_REAPER_TTL_MINUTES;
+    const cutoffIso = new Date(
+      Date.now() - olderThanMinutes * 60 * 1000,
+    ).toISOString();
+    const candidates = await this.repo.listUnattachedCreatedBefore(cutoffIso, {
+      userId: options.userId,
+      fileType: options.fileType,
+    });
+    const deletedIds: string[] = [];
+
+    for (const candidate of candidates) {
+      const deleted = await this.repo.deleteIfUnattached(
+        candidate.id,
+        candidate.userId,
+      );
+      if (!deleted) {
+        continue;
+      }
+
+      const diskPath = getUserFilePath(deleted.userId, deleted.fileName);
+      if (fs.existsSync(diskPath)) {
+        fs.unlinkSync(diskPath);
+      }
+      deletedIds.push(deleted.id);
+    }
+
+    return deletedIds;
   }
 
   /**

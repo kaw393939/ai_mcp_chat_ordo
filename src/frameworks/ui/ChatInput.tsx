@@ -1,8 +1,9 @@
-import React, { useRef } from "react";
+import React, { useEffect, useRef } from "react";
 import MentionsMenu from "@/components/MentionsMenu";
 import type { MentionItem } from "@/core/entities/mentions";
 
 interface ChatInputProps {
+  inputRef?: React.RefObject<HTMLTextAreaElement | null>;
   value: string;
   onChange: (val: string, selectionStart: number) => void;
   onSend: () => void;
@@ -24,6 +25,7 @@ interface ChatInputProps {
 }
 
 export const ChatInput: React.FC<ChatInputProps> = ({
+  inputRef,
   value,
   onChange,
   onSend,
@@ -39,8 +41,21 @@ export const ChatInput: React.FC<ChatInputProps> = ({
   onFileSelect,
   onFileRemove,
 }) => {
-  const textareaRef = useRef<HTMLInputElement>(null);
+  const internalTextareaRef = useRef<HTMLTextAreaElement>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const textareaRef = inputRef ?? internalTextareaRef;
+
+  useEffect(() => {
+    const element = textareaRef.current;
+    if (!element) {
+      return;
+    }
+
+    element.style.height = "0px";
+    const nextHeight = Math.min(element.scrollHeight, 224);
+    element.style.height = `${Math.max(nextHeight, 44)}px`;
+    element.style.overflowY = element.scrollHeight > 224 ? "auto" : "hidden";
+  }, [textareaRef, value]);
 
   const handleMentionsNavigation = (e: React.KeyboardEvent): boolean => {
     if (!activeTrigger || suggestions.length === 0) return false;
@@ -123,7 +138,7 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           e.preventDefault();
           onSend();
         }}
-        className="relative flex items-center gap-2 bg-surface border-theme rounded-[28px] transition-all duration-500 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/10 shadow-sm hover:shadow-md"
+        className="relative flex items-end gap-2 bg-surface border-theme rounded-[28px] transition-all duration-500 focus-within:border-accent focus-within:ring-2 focus-within:ring-accent/10 shadow-sm hover:shadow-md"
         style={{ padding: 'var(--input-padding)' }}
       >
         {activeTrigger && suggestions.length > 0 && (
@@ -154,19 +169,19 @@ export const ChatInput: React.FC<ChatInputProps> = ({
           </svg>
         </button>
 
-        <input
+        <textarea
           ref={textareaRef}
-          type="text"
           value={value}
           onChange={(e) => onChange(e.target.value, e.target.selectionStart ?? 0)}
           onKeyDown={handleKeyDown}
           placeholder="Ask anything…"
-          className="flex-1 min-w-0 bg-transparent px-2 py-2 text-[13px] leading-tight outline-none placeholder:text-foreground/50 font-normal text-foreground sm:px-3 sm:text-sm"
+          rows={1}
+          className="max-h-56 min-h-11 flex-1 resize-none overflow-y-auto bg-transparent px-2 py-2 text-[13px] leading-6 outline-none placeholder:text-foreground/50 font-normal text-foreground sm:px-3 sm:text-sm"
         />
 
         <button
           type="submit"
-          disabled={!canSend && pendingFiles.length === 0}
+          disabled={!canSend}
           className="focus-ring flex min-h-11 shrink-0 items-center gap-2 rounded-full accent-fill px-4 py-2 text-[11px] font-bold uppercase tracking-[0.15em] shadow-sm transition-all duration-200 hover:scale-[1.02] hover:shadow-md active:scale-95 disabled:bg-surface-muted disabled:text-foreground/40 disabled:shadow-none sm:px-5"
         >
           {isSending ? (

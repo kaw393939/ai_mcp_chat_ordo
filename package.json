@@ -23,6 +23,7 @@
     "admin:validate-env": "tsx scripts/admin-validate-env.ts",
     "admin:health": "tsx scripts/admin-health-sweep.ts",
     "admin:diagnostics": "tsx scripts/admin-diagnostics.ts",
+    "admin:reap-chat-uploads": "tsx scripts/reap-chat-uploads.ts",
     "repair:conversation-indexes": "tsx scripts/repair-conversation-indexes.ts",
     "scan:secrets": "node scripts/scan-secrets.mjs",
     "check:stateless": "node scripts/assert-stateless-runtime.mjs",

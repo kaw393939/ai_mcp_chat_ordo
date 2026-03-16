@@ -4,8 +4,9 @@ import type { VectorStore, VectorQuery } from "@/core/search/ports/VectorStore";
 import type { BM25IndexStore } from "@/core/search/ports/BM25IndexStore";
 import type { SearchHandler } from "@/core/search/ports/SearchHandler";
 import type { EmbeddingPipelineFactory } from "@/core/search/EmbeddingPipelineFactory";
-import type { BookChunkMetadata } from "@/core/search/ports/Chunker";
+import type { DocumentChunkMetadata } from "@/core/search/ports/Chunker";
 import type { BookRepository } from "@/core/use-cases/BookRepository";
+import { corpusConfig } from "@/lib/corpus-config";
 
 export interface EmbeddingToolDeps {
   embedder: Embedder;
@@ -42,14 +43,22 @@ export async function embedDocument(
     );
   }
   const pipeline = deps.pipelineFactory.createForSource(
-    args.source_type as "book_chunk",
+    args.source_type,
   );
   const [bookSlug, chapterSlug] = args.source_id.split("/");
-  const metadata: BookChunkMetadata = {
-    sourceType: "book_chunk",
+  const firstSentence = args.content.split(/[.!?]\s/)[0]?.slice(0, 200) ?? "";
+  const metadata: DocumentChunkMetadata = {
+    sourceType: args.source_type,
+    documentSlug: bookSlug ?? args.source_id,
+    sectionSlug: chapterSlug ?? "",
+    documentTitle: bookSlug ?? "",
+    documentId: bookSlug ?? args.source_id,
+    sectionTitle: chapterSlug ?? "",
+    sectionFirstSentence: firstSentence,
     bookSlug: bookSlug ?? args.source_id,
     chapterSlug: chapterSlug ?? "",
     bookTitle: bookSlug ?? "",
+    bookNumber: bookSlug ?? args.source_id,
     chapterTitle: chapterSlug ?? "",
     chapterFirstSentence:
       args.content.split(/[.!?]\s/)[0]?.slice(0, 200) ?? "",
@@ -90,18 +99,19 @@ export async function rebuildIndex(
   if (!args.source_type) {
     throw new Error("rebuild_index requires a source_type.");
   }
-  if (args.source_type !== "book_chunk") {
+  if (args.source_type !== corpusConfig.sourceType && args.source_type !== corpusConfig.legacySourceType) {
     throw new Error(
-      `Unsupported source_type: ${args.source_type}. Only "book_chunk" is supported.`,
+      `Unsupported source_type: ${args.source_type}. Only "${corpusConfig.sourceType}" is supported.`,
     );
   }
 
-  const pipeline = deps.pipelineFactory.createForSource("book_chunk");
+  const pipeline = deps.pipelineFactory.createForSource(corpusConfig.sourceType);
   const [books, chapters] = await Promise.all([
     deps.bookRepo.getAllBooks(),
     deps.bookRepo.getAllChapters(),
   ]);
   const bookTitleMap = new Map(books.map((b) => [b.slug, b.title]));
+  const bookIdMap = new Map(books.map((b) => [b.slug, b.id]));
 
   if (args.force) {
     for (const ch of chapters) {
@@ -114,17 +124,24 @@ export async function rebuildIndex(
     content: ch.content,
     contentHash: createHash("sha256").update(ch.content).digest("hex"),
     metadata: {
-      sourceType: "book_chunk" as const,
+      sourceType: corpusConfig.sourceType,
+      documentSlug: ch.bookSlug,
+      sectionSlug: ch.chapterSlug,
+      documentTitle: bookTitleMap.get(ch.bookSlug) ?? ch.bookSlug,
+      documentId: bookIdMap.get(ch.bookSlug) ?? ch.bookSlug,
+      sectionTitle: ch.title,
+      sectionFirstSentence:
+        ch.content.split(/[.!?]\s/)[0]?.slice(0, 200) ?? "",
       bookSlug: ch.bookSlug,
       chapterSlug: ch.chapterSlug,
       bookTitle: bookTitleMap.get(ch.bookSlug) ?? ch.bookSlug,
+      bookNumber: bookIdMap.get(ch.bookSlug) ?? ch.bookSlug,
       chapterTitle: ch.title,
-      chapterFirstSentence:
-        ch.content.split(/[.!?]\s/)[0]?.slice(0, 200) ?? "",
-    } satisfies BookChunkMetadata,
+      chapterFirstSentence: ch.content.split(/[.!?]\s/)[0]?.slice(0, 200) ?? "",
+    } satisfies DocumentChunkMetadata,
   }));
 
-  const result = await pipeline.rebuildAll("book_chunk", documents);
+  const result = await pipeline.rebuildAll(corpusConfig.sourceType, documents);
   return result;
 }
 
@@ -133,7 +150,7 @@ export function getIndexStats(
   deps: EmbeddingToolDeps,
   args: { source_type?: string },
 ) {
-  const sourceType = args.source_type ?? "book_chunk";
+  const sourceType = args.source_type ?? corpusConfig.sourceType;
   const embeddingCount = deps.vectorStore.count(sourceType);
   const bm25Index = deps.bm25IndexStore.getIndex(sourceType);
   return {

@@ -17,7 +17,7 @@ export class EmbeddingPipelineFactory {
   ) {}
 
   createForSource(
-    sourceType: "book_chunk" | "conversation",
+    sourceType: string,
   ): EmbeddingPipeline {
     const chunker = sourceType === "conversation"
       ? new ConversationChunker()

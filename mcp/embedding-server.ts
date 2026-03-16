@@ -6,8 +6,8 @@ import {
   ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import { getDb } from "@/lib/db";
-import { FileSystemBookRepository } from "@/adapters/FileSystemBookRepository";
-import { CachedBookRepository } from "@/adapters/CachedBookRepository";
+import { FileSystemCorpusRepository } from "@/adapters/FileSystemCorpusRepository";
+import { CachedCorpusRepository } from "@/adapters/CachedCorpusRepository";
 import { LocalEmbedder } from "@/adapters/LocalEmbedder";
 import { SQLiteVectorStore } from "@/adapters/SQLiteVectorStore";
 import { SQLiteBM25IndexStore } from "@/adapters/SQLiteBM25IndexStore";
@@ -35,14 +35,14 @@ import {
   getIndexStats,
   deleteEmbeddings,
 } from "./embedding-tool";
-import type { LibrarianToolDeps } from "./librarian-tool";
+import type { CorpusToolDeps } from "./librarian-tool";
 import {
-  librarianList,
-  librarianGetBook,
-  librarianAddBook,
-  librarianAddChapter,
-  librarianRemoveBook,
-  librarianRemoveChapter,
+  corpusList,
+  corpusGetDocument,
+  corpusAddDocument,
+  corpusAddSection,
+  corpusRemoveDocument,
+  corpusRemoveSection,
 } from "./librarian-tool";
 import type { PromptToolDeps } from "./prompt-tool";
 import {
@@ -52,16 +52,24 @@ import {
   promptRollback,
   promptDiff,
 } from "./prompt-tool";
+import type { AnalyticsToolDeps } from "./analytics-tool";
+import {
+  conversationAnalytics,
+  conversationInspect,
+  conversationCohort,
+} from "./analytics-tool";
 import { SystemPromptDataMapper } from "@/adapters/SystemPromptDataMapper";
 import { ConversationEventDataMapper } from "@/adapters/ConversationEventDataMapper";
 import { ConversationEventRecorder } from "@/core/use-cases/ConversationEventRecorder";
+import { corpusConfig } from "@/lib/corpus-config";
 
 const MODEL_VERSION = "all-MiniLM-L6-v2@1.0";
 
 interface AllDeps {
   embedding: EmbeddingToolDeps;
-  librarian: LibrarianToolDeps;
+  librarian: CorpusToolDeps;
   prompt: PromptToolDeps;
+  analytics: AnalyticsToolDeps;
 }
 
 function buildDeps(): AllDeps {
@@ -71,8 +79,8 @@ function buildDeps(): AllDeps {
   const bm25IndexStore = new SQLiteBM25IndexStore(db);
 
   // Build repo graph directly to capture concrete types for cache clearing
-  const fsRepo = new FileSystemBookRepository();
-  const cached = new CachedBookRepository(fsRepo);
+  const fsRepo = new FileSystemCorpusRepository();
+  const cached = new CachedCorpusRepository(fsRepo);
   const bookRepo = cached;
 
   const pipelineFactory = new EmbeddingPipelineFactory(
@@ -100,12 +108,13 @@ function buildDeps(): AllDeps {
     bm25Processor,
     { vectorTopN: 50, bm25TopN: 50, rrfK: 60, maxResults: 10 },
   );
-  const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore);
+  const hybrid = new HybridSearchHandler(engine, embedder, bm25IndexStore, corpusConfig.sourceType);
   const bm25 = new BM25SearchHandler(
     bm25Scorer,
     bm25IndexStore,
     vectorStore,
     bm25Processor,
+    corpusConfig.sourceType,
   );
   const legacy = new LegacyKeywordHandler(bookRepo);
   const empty = new EmptyResultHandler();
@@ -151,6 +160,9 @@ function buildDeps(): AllDeps {
         return rows.map((r) => r.id);
       },
     },
+    analytics: {
+      db,
+    },
   };
 }
 
@@ -188,7 +200,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {
           source_type: {
             type: "string",
-            description: "Source type (e.g. 'book_chunk').",
+            description: `Source type (e.g. '${corpusConfig.sourceType}').`,
           },
           source_id: {
             type: "string",
@@ -229,7 +241,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         properties: {
           source_type: {
             type: "string",
-            description: "Source type to rebuild (e.g. 'book_chunk').",
+            description: `Source type to rebuild (e.g. '${corpusConfig.sourceType}').`,
           },
           force: {
             type: "boolean",
@@ -271,9 +283,9 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
     },
     // --- Librarian tools ---
     {
-      name: "librarian_list",
+      name: "corpus_list",
       description:
-        "List all books in the corpus with chapter counts and indexing status.",
+        "List all documents in the corpus with section counts and indexing status.",
       inputSchema: {
         type: "object" as const,
         properties: {},
@@ -281,31 +293,31 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
-      name: "librarian_get_book",
+      name: "corpus_get",
       description:
-        "Get details of a corpus book including its chapters.",
+        "Get details of a corpus document including its sections.",
       inputSchema: {
         type: "object" as const,
         properties: {
-          slug: { type: "string", description: "Book slug." },
+          slug: { type: "string", description: "Document slug." },
         },
         required: ["slug"],
         additionalProperties: false,
       },
     },
     {
-      name: "librarian_add_book",
+      name: "corpus_add_document",
       description:
-        "Add a new book to the corpus. Provide slug/title/number/sortOrder/domain/chapters, OR a base64-encoded zip archive containing book.json and chapters/.",
+        "Add a new document to the corpus. Provide slug/title/number/sortOrder/domain/chapters, OR a base64-encoded zip archive containing book.json and chapters/.",
       inputSchema: {
         type: "object" as const,
         properties: {
           slug: {
             type: "string",
             description:
-              "Book slug (lowercase kebab-case). Becomes the directory name.",
+              "Document slug (lowercase kebab-case). Becomes the directory name.",
           },
-          title: { type: "string", description: "Book title." },
+          title: { type: "string", description: "Document title." },
           number: {
             type: "string",
             description: "Display number (e.g. 'XI'). Decorative only.",
@@ -325,7 +337,7 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
           },
           chapters: {
             type: "array",
-            description: "Array of {slug, content} chapter objects.",
+            description: "Array of {slug, content} section objects.",
             items: {
               type: "object",
               properties: {
@@ -345,23 +357,23 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
-      name: "librarian_add_chapter",
+      name: "corpus_add_section",
       description:
-        "Add a chapter to an existing book in the corpus. Overwrites if the chapter already exists.",
+        "Add a section to an existing document in the corpus. Overwrites if the section already exists.",
       inputSchema: {
         type: "object" as const,
         properties: {
           book_slug: {
             type: "string",
-            description: "Slug of the target book.",
+            description: "Slug of the target document.",
           },
           chapter_slug: {
             type: "string",
-            description: "Chapter slug (becomes filename).",
+            description: "Section slug (becomes filename).",
           },
           content: {
             type: "string",
-            description: "Chapter markdown content.",
+            description: "Section markdown content.",
           },
         },
         required: ["book_slug", "chapter_slug", "content"],
@@ -369,15 +381,15 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
-      name: "librarian_remove_book",
+      name: "corpus_remove_document",
       description:
-        "Remove a book and all its embeddings from the corpus.",
+        "Remove a document and all its embeddings from the corpus.",
       inputSchema: {
         type: "object" as const,
         properties: {
           slug: {
             type: "string",
-            description: "Book slug to remove.",
+            description: "Document slug to remove.",
           },
         },
         required: ["slug"],
@@ -385,16 +397,16 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
       },
     },
     {
-      name: "librarian_remove_chapter",
+      name: "corpus_remove_section",
       description:
-        "Remove a single chapter and its embeddings from a book.",
+        "Remove a single section and its embeddings from a document.",
       inputSchema: {
         type: "object" as const,
         properties: {
-          book_slug: { type: "string", description: "Book slug." },
+          book_slug: { type: "string", description: "Document slug." },
           chapter_slug: {
             type: "string",
-            description: "Chapter slug to remove.",
+            description: "Section slug to remove.",
           },
         },
         required: ["book_slug", "chapter_slug"],
@@ -472,6 +484,52 @@ server.setRequestHandler(ListToolsRequestSchema, async () => ({
         additionalProperties: false,
       },
     },
+    {
+      name: "conversation_analytics",
+      description: "Aggregate conversation analytics for overview, funnel, engagement, tool usage, and drop-off review.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          metric: {
+            type: "string",
+            description: "Analytics metric: overview, funnel, engagement, tool_usage, or drop_off.",
+          },
+          time_range: {
+            type: "string",
+            description: "Time window: 24h, 7d, 30d, or all.",
+          },
+        },
+        required: ["metric"],
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "conversation_inspect",
+      description: "Inspect one conversation or the most recent conversations for a user, with previews and event timeline.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          conversation_id: { type: "string", description: "Conversation ID to inspect." },
+          user_id: { type: "string", description: "User ID to inspect if conversation_id is omitted." },
+          limit: { type: "number", description: "Max conversations to return when using user_id." },
+        },
+        additionalProperties: false,
+      },
+    },
+    {
+      name: "conversation_cohort",
+      description: "Compare two cohorts across message count, tool usage, session duration, or return rate.",
+      inputSchema: {
+        type: "object" as const,
+        properties: {
+          cohort_a: { type: "string", description: "First cohort: anonymous, authenticated, or converted." },
+          cohort_b: { type: "string", description: "Second cohort: anonymous, authenticated, or converted." },
+          metric: { type: "string", description: "Comparison metric: message_count, tool_usage, session_duration, or return_rate." },
+        },
+        required: ["cohort_a", "cohort_b", "metric"],
+        additionalProperties: false,
+      },
+    },
   ],
 }));
 
@@ -510,17 +568,20 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       result = deleteEmbeddings(d.embedding, a as { source_id: string });
       break;
     // --- Librarian tools ---
+    case "corpus_list":
     case "librarian_list":
-      result = await librarianList(d.librarian);
+      result = await corpusList(d.librarian);
       break;
+    case "corpus_get":
     case "librarian_get_book":
-      result = await librarianGetBook(
+      result = await corpusGetDocument(
         d.librarian,
         a as { slug: string },
       );
       break;
+    case "corpus_add_document":
     case "librarian_add_book":
-      result = await librarianAddBook(
+      result = await corpusAddDocument(
         d.librarian,
         a as {
           slug?: string;
@@ -534,20 +595,23 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
         },
       );
       break;
+    case "corpus_add_section":
     case "librarian_add_chapter":
-      result = await librarianAddChapter(
+      result = await corpusAddSection(
         d.librarian,
         a as { book_slug: string; chapter_slug: string; content: string },
       );
       break;
+    case "corpus_remove_document":
     case "librarian_remove_book":
-      result = await librarianRemoveBook(
+      result = await corpusRemoveDocument(
         d.librarian,
         a as { slug: string },
       );
       break;
+    case "corpus_remove_section":
     case "librarian_remove_chapter":
-      result = await librarianRemoveChapter(
+      result = await corpusRemoveSection(
         d.librarian,
         a as { book_slug: string; chapter_slug: string },
       );
@@ -567,6 +631,26 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
       break;
     case "prompt_diff":
       result = await promptDiff(d.prompt, a as { role: string; prompt_type: string; version_a: number; version_b: number });
+      break;
+    case "conversation_analytics":
+      result = await conversationAnalytics(d.analytics, a as {
+        metric: "overview" | "funnel" | "engagement" | "tool_usage" | "drop_off";
+        time_range?: "24h" | "7d" | "30d" | "all";
+      });
+      break;
+    case "conversation_inspect":
+      result = await conversationInspect(d.analytics, a as {
+        conversation_id?: string;
+        user_id?: string;
+        limit?: number;
+      });
+      break;
+    case "conversation_cohort":
+      result = await conversationCohort(d.analytics, a as {
+        cohort_a: "anonymous" | "authenticated" | "converted";
+        cohort_b: "anonymous" | "authenticated" | "converted";
+        metric: "message_count" | "tool_usage" | "session_duration" | "return_rate";
+      });
       break;
     default:
       throw new Error(`Unknown tool: ${name}`);

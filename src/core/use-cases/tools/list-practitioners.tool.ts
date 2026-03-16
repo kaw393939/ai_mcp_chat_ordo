@@ -1,6 +1,6 @@
 import type { ToolDescriptor } from "@/core/tool-registry/ToolDescriptor";
 import type { BookRepository } from "../BookRepository";
-import { ListPractitionersCommand } from "./BookTools";
+import { ListPractitionersCommand } from "./CorpusTools";
 
 export function createListPractitionersTool(repo: BookRepository): ToolDescriptor {
   return {

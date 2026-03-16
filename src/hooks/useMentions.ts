@@ -9,7 +9,6 @@ import {
   FRAMEWORKS,
   type MentionItem
 } from "../core/entities/mentions";
-import { commandRegistry } from "../core/commands/CommandRegistry";
 
 export type MentionTrigger = {
   char: string;
@@ -25,6 +24,9 @@ export const TRIGGERS: MentionTrigger[] = [
 
 export function useMentions(
   textareaRef: RefObject<HTMLTextAreaElement | null>,
+  options?: {
+    findCommands?: (query: string) => MentionItem[];
+  },
 ) {
   const [activeTrigger, setActiveTrigger] = useState<MentionTrigger | null>(
     null,
@@ -55,14 +57,7 @@ export function useMentions(
             let filtered: MentionItem[] = [];
             
             if (trigger.char === "/") {
-              const commands = commandRegistry.findCommands(segment);
-              filtered = commands.map(cmd => ({
-                id: cmd.id,
-                name: cmd.id,
-                category: "command" as MentionCategory,
-                description: cmd.title,
-                icon: cmd.icon || "⚡️"
-              }));
+              filtered = options?.findCommands?.(segment) ?? [];
             } else {
               const source =
                 trigger.category === "practitioner"
@@ -96,7 +91,7 @@ export function useMentions(
         setSuggestions([]);
       }
     },
-    [textareaRef],
+    [options, textareaRef],
   );
 
   const insertMention = useCallback(

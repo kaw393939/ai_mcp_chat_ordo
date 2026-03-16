@@ -160,7 +160,7 @@ describe("librarian_add_book (zip mode)", () => {
 
     await expect(
       librarianAddBook(deps, { zip_base64: zipBase64 }),
-    ).rejects.toThrow("Book already exists");
+    ).rejects.toThrow("Document already exists");
   });
 
   it("rejects zip with path traversal", async () => {

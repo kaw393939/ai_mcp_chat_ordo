@@ -1,11 +1,20 @@
 /** Discriminated union for type-safe, source-specific chunk metadata (GB-1) */
-export interface BookChunkMetadata {
-  sourceType: "book_chunk";
-  bookSlug: string;
-  chapterSlug: string;
-  bookTitle: string;
-  chapterTitle: string;
-  chapterFirstSentence: string; // for enriched prefix (GH-2)
+export interface DocumentChunkMetadata {
+  sourceType: string;
+  documentSlug?: string;
+  sectionSlug?: string;
+  documentTitle?: string;
+  documentId?: string;
+  sectionTitle?: string;
+  sectionFirstSentence?: string;
+  contributors?: string[];
+  supplements?: string[];
+  bookSlug?: string;
+  chapterSlug?: string;
+  bookTitle?: string;
+  bookNumber?: string;
+  chapterTitle?: string;
+  chapterFirstSentence?: string;
   practitioners?: string[];
   checklistItems?: string[];
 }
@@ -18,7 +27,7 @@ export interface ConversationMetadata {
   turnIndex: number;
 }
 
-export type ChunkMetadata = BookChunkMetadata | ConversationMetadata;
+export type ChunkMetadata = DocumentChunkMetadata | ConversationMetadata;
 
 export interface Chunk {
   content: string; // the raw text (for display)
@@ -43,3 +52,5 @@ export interface Chunker {
     options?: ChunkerOptions,
   ): Chunk[];
 }
+
+export type BookChunkMetadata = DocumentChunkMetadata;

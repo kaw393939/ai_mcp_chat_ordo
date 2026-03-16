@@ -1,6 +1,6 @@
 import type { ToolDescriptor } from "@/core/tool-registry/ToolDescriptor";
 import type { BookRepository } from "../BookRepository";
-import { GetChapterCommand } from "./BookTools";
+import { GetChapterCommand } from "./CorpusTools";
 
 export function createGetChapterTool(repo: BookRepository): ToolDescriptor {
   return {

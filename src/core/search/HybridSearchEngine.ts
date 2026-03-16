@@ -7,7 +7,7 @@ import type { QueryProcessor } from "./QueryProcessor";
 import { dotSimilarity } from "./dotSimilarity";
 import { l2Normalize } from "./l2Normalize";
 import { reciprocalRankFusion } from "./ReciprocalRankFusion";
-import { highlightTerms, deduplicateByChapter, assignRelevance } from "./ResultFormatter";
+import { highlightTerms, deduplicateBySection, assignRelevance } from "./ResultFormatter";
 
 export interface HybridSearchOptions {
   vectorTopN: number;
@@ -28,6 +28,8 @@ export class HybridSearchEngine {
   ) {}
 
   async search(query: string, filters?: VectorQuery): Promise<HybridSearchResult[]> {
+    const sourceType = filters?.sourceType ?? "document_chunk";
+
     // 1. Process query through both pipelines
     const vectorTokens = this.vectorQueryProcessor.process(query);
     const bm25Tokens = this.bm25QueryProcessor.process(query);
@@ -35,6 +37,7 @@ export class HybridSearchEngine {
     // 2. Get all passage records
     const storeQuery: VectorQuery = {
       ...filters,
+      sourceType,
       chunkLevel: "passage",
     };
     const records = this.vectorStore.getAll(storeQuery);
@@ -54,9 +57,7 @@ export class HybridSearchEngine {
     vectorTop.forEach((item, i) => vectorRanking.set(item.record.id, i + 1));
 
     // 4. BM25 retrieval
-    const bm25Index = this.bm25IndexStore.getIndex(
-      filters?.sourceType ?? "book_chunk",
-    );
+    const bm25Index = this.bm25IndexStore.getIndex(sourceType);
 
     const bm25Ranking = new Map<string, number>();
     if (bm25Index) {
@@ -82,15 +83,20 @@ export class HybridSearchEngine {
     const recordMap = new Map<string, EmbeddingRecord>();
     for (const r of records) recordMap.set(r.id, r);
 
-    const merged = [...rrfScores.entries()]
+    const merged: HybridSearchResult[] = [...rrfScores.entries()]
       .sort((a, b) => b[1] - a[1])
-      .map(([id, score], rank) => {
+      .flatMap(([id, score], rank) => {
         const record = recordMap.get(id);
         if (!record) {
-          return null;
+          return [];
         }
 
         const meta = record.metadata as {
+          documentTitle?: string;
+          documentId?: string;
+          documentSlug?: string;
+          sectionTitle?: string;
+          sectionSlug?: string;
           bookTitle?: string;
           bookNumber?: string;
           bookSlug?: string;
@@ -98,12 +104,18 @@ export class HybridSearchEngine {
           chapterSlug?: string;
         };
 
-        return {
-          bookTitle: meta.bookTitle ?? "",
-          bookNumber: meta.bookNumber ?? "",
-          bookSlug: meta.bookSlug ?? "",
-          chapterTitle: meta.chapterTitle ?? "",
-          chapterSlug: meta.chapterSlug ?? "",
+        const documentTitle = meta.documentTitle ?? meta.bookTitle ?? "";
+        const documentId = meta.documentId ?? meta.bookNumber ?? "";
+        const documentSlug = meta.documentSlug ?? meta.bookSlug ?? "";
+        const sectionTitle = meta.sectionTitle ?? meta.chapterTitle ?? "";
+        const sectionSlug = meta.sectionSlug ?? meta.chapterSlug ?? "";
+
+        return [{
+          documentTitle,
+          documentId,
+          documentSlug,
+          sectionTitle,
+          sectionSlug,
           rrfScore: score,
           vectorRank: vectorRanking.get(id) ?? null,
           bm25Rank: bm25Ranking.get(id) ?? null,
@@ -115,12 +127,16 @@ export class HybridSearchEngine {
             start: record.chunkIndex * 400,
             end: record.chunkIndex * 400 + record.content.length,
           },
-        } satisfies HybridSearchResult;
-      })
-      .filter((result): result is HybridSearchResult => result !== null);
+          bookTitle: documentTitle,
+          bookNumber: documentId,
+          bookSlug: documentSlug,
+          chapterTitle: sectionTitle,
+          chapterSlug: sectionSlug,
+        } satisfies HybridSearchResult];
+      });
 
     // 7. Deduplication
-    const deduped = deduplicateByChapter(merged);
+    const deduped = deduplicateBySection(merged);
 
     // 8. Return top N
     return deduped.slice(0, this.options.maxResults);

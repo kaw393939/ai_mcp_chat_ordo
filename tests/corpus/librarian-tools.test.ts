@@ -168,7 +168,7 @@ describe("librarian_get_book", () => {
   it("throws for missing book", async () => {
     await expect(
       librarianGetBook(deps, { slug: "nonexistent" }),
-    ).rejects.toThrow("Book not found");
+    ).rejects.toThrow("Document not found");
   });
 });
 
@@ -241,7 +241,7 @@ describe("librarian_add_book", () => {
         sortOrder: 1,
         domain: ["teaching"],
       }),
-    ).rejects.toThrow("Book already exists");
+    ).rejects.toThrow("Document already exists");
   });
 
   it("rejects missing fields", async () => {
@@ -341,7 +341,7 @@ describe("librarian_add_chapter", () => {
         chapter_slug: "ch00-test",
         content: "content",
       }),
-    ).rejects.toThrow("Book not found");
+    ).rejects.toThrow("Document not found");
   });
 
   it("rejects empty content", async () => {
@@ -389,7 +389,7 @@ describe("librarian_remove_book", () => {
   it("rejects removing missing book", async () => {
     await expect(
       librarianRemoveBook(deps, { slug: "nonexistent" }),
-    ).rejects.toThrow("Book not found");
+    ).rejects.toThrow("Document not found");
   });
 });
 

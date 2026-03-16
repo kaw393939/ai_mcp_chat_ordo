@@ -1,6 +1,6 @@
 import type { ToolDescriptor } from "@/core/tool-registry/ToolDescriptor";
 import type { BookRepository } from "../BookRepository";
-import { GetChecklistCommand } from "./BookTools";
+import { GetChecklistCommand } from "./CorpusTools";
 
 export function createGetChecklistTool(repo: BookRepository): ToolDescriptor {
   return {

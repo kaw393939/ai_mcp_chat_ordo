@@ -6,5 +6,11 @@ export interface UserFileRepository {
   findByHash(userId: string, contentHash: string, fileType: UserFile["fileType"]): Promise<UserFile | null>;
   listByConversation(conversationId: string): Promise<UserFile[]>;
   listByUser(userId: string): Promise<UserFile[]>;
+  listUnattachedCreatedBefore(cutoffIso: string, options?: {
+    userId?: string;
+    fileType?: UserFile["fileType"];
+  }): Promise<UserFile[]>;
+  assignConversation(fileIds: string[], userId: string, conversationId: string): Promise<void>;
+  deleteIfUnattached(id: string, userId: string): Promise<UserFile | null>;
   delete(id: string): Promise<void>;
 }

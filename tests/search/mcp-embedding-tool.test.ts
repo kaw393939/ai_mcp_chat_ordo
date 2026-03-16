@@ -184,12 +184,12 @@ describe("searchSimilar (VSEARCH-32)", () => {
     const deps = createDeps({ searchHandler: handler });
     await searchSimilar(deps, {
       query: "test",
-      source_type: "book_chunk",
+      source_type: "document_chunk",
       limit: 5,
     });
 
     expect(handler.search).toHaveBeenCalledWith("test", {
-      sourceType: "book_chunk",
+      sourceType: "document_chunk",
       limit: 5,
     });
   });
@@ -205,13 +205,13 @@ describe("searchSimilar (VSEARCH-32)", () => {
 describe("rebuildIndex (VSEARCH-33)", () => {
   it("delegates to pipeline.rebuildAll and returns RebuildResult", async () => {
     const deps = createDeps();
-    const result = await rebuildIndex(deps, { source_type: "book_chunk" });
+    const result = await rebuildIndex(deps, { source_type: "document_chunk" });
 
     expect(result).toEqual(MOCK_REBUILD_RESULT);
     const factory = deps.pipelineFactory as unknown as {
       createForSource: ReturnType<typeof vi.fn>;
     };
-    expect(factory.createForSource).toHaveBeenCalledWith("book_chunk");
+    expect(factory.createForSource).toHaveBeenCalledWith("document_chunk");
   });
 
   it("throws for unsupported source_type", async () => {
@@ -219,7 +219,7 @@ describe("rebuildIndex (VSEARCH-33)", () => {
     await expect(
       rebuildIndex(deps, { source_type: "conversation" }),
     ).rejects.toThrow(
-      'Unsupported source_type: conversation. Only "book_chunk" is supported.',
+      'Unsupported source_type: conversation. Only "document_chunk" is supported.',
     );
   });
 
@@ -234,7 +234,7 @@ describe("rebuildIndex (VSEARCH-33)", () => {
 describe("getIndexStats (VSEARCH-34)", () => {
   it("returns embeddingCount, bm25 stats, and embedder readiness", () => {
     const bm25Store = new InMemoryBM25IndexStore();
-    bm25Store.saveIndex("book_chunk", {
+    bm25Store.saveIndex("document_chunk", {
       avgDocLength: 150,
       docCount: 10,
       docLengths: new Map(),
@@ -242,9 +242,9 @@ describe("getIndexStats (VSEARCH-34)", () => {
     });
 
     const deps = createDeps({ bm25IndexStore: bm25Store });
-    const result = getIndexStats(deps, { source_type: "book_chunk" });
+    const result = getIndexStats(deps, { source_type: "document_chunk" });
 
-    expect(result.sourceType).toBe("book_chunk");
+    expect(result.sourceType).toBe("document_chunk");
     expect(result.embeddingCount).toBe(0);
     expect(result.bm25DocCount).toBe(10);
     expect(result.bm25AvgDocLength).toBe(150);
@@ -253,10 +253,10 @@ describe("getIndexStats (VSEARCH-34)", () => {
     expect(result.dimensions).toBe(384);
   });
 
-  it("defaults to book_chunk when no source_type given", () => {
+  it("defaults to document_chunk when no source_type given", () => {
     const deps = createDeps();
     const result = getIndexStats(deps, {});
-    expect(result.sourceType).toBe("book_chunk");
+    expect(result.sourceType).toBe("document_chunk");
   });
 });
 

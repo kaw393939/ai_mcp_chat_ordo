@@ -1,6 +1,7 @@
 import type {
   Chunk,
   ChunkMetadata,
+  DocumentChunkMetadata,
   Chunker,
   ChunkerOptions,
 } from "./ports/Chunker";
@@ -281,11 +282,12 @@ export class MarkdownChunker implements Chunker {
     metadata: ChunkMetadata,
     sectionHeading: string | null,
   ): string {
-    if (metadata.sourceType === "book_chunk") {
+    if (metadata.sourceType !== "conversation") {
+      const documentMetadata = metadata as DocumentChunkMetadata;
       return buildPrefix(
-        metadata.bookTitle,
-        metadata.chapterTitle,
-        metadata.chapterFirstSentence,
+        documentMetadata.documentTitle ?? documentMetadata.bookTitle ?? "",
+        documentMetadata.sectionTitle ?? documentMetadata.chapterTitle ?? "",
+        documentMetadata.sectionFirstSentence ?? documentMetadata.chapterFirstSentence ?? "",
         sectionHeading,
       );
     }
@@ -331,13 +333,13 @@ export class MarkdownChunker implements Chunker {
 
 /** Contextual prefix for embedding input (GH-2, §3.3) */
 export function buildPrefix(
-  bookTitle: string,
-  chapterTitle: string,
-  chapterFirstSentence: string,
+  documentTitle: string,
+  sectionTitle: string,
+  sectionFirstSentence: string,
   sectionHeading: string | null,
 ): string {
-  const chapterContext = `${bookTitle}: ${chapterTitle}. ${chapterFirstSentence}`;
-  return sectionHeading ? `${chapterContext} > ${sectionHeading}` : chapterContext;
+  const sectionContext = `${documentTitle}: ${sectionTitle}. ${sectionFirstSentence}`;
+  return sectionHeading ? `${sectionContext} > ${sectionHeading}` : sectionContext;
 }
 
 /** Strip markdown formatting for embedding input (GB-2, §3.8) */

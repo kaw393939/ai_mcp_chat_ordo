@@ -1,22 +1,17 @@
 "use client";
 
 import React, { useState, useMemo, useRef, useCallback, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import { useGlobalChat } from "@/hooks/useGlobalChat";
-import { useChatScroll } from "@/hooks/useChatScroll";
 import { useTheme } from "@/components/ThemeProvider";
-import { useMentions } from "@/hooks/useMentions";
-import { useMessageScrollBoundaryLock } from "@/hooks/useMessageScrollBoundaryLock";
 import { ChatHeader } from "./ChatHeader";
-import { MessageList } from "./MessageList";
+import { ChatMessageViewport } from "./ChatMessageViewport";
 import { ChatInput } from "./ChatInput";
 import { ConversationSidebar } from "./ConversationSidebar";
-import { ChatPresenter } from "../../adapters/ChatPresenter";
-import { MarkdownParserService } from "../../adapters/MarkdownParserService";
-import { CommandParserService } from "../../adapters/CommandParserService";
 import { useUICommands } from "@/hooks/useUICommands";
-import { useCommandRegistry } from "@/hooks/useCommandRegistry";
+import { usePresentedChatMessages } from "@/hooks/usePresentedChatMessages";
+import { useChatComposerController } from "@/hooks/chat/useChatComposerController";
 import { supportsReducedMotion, supportsViewTransitions } from "@/lib/ui/browserSupport";
-import { commandRegistry } from "../../core/commands/CommandRegistry";
 
 interface Props {
   isFloating?: boolean;
@@ -30,7 +25,8 @@ export const ChatContainer: React.FC<Props> = ({
   isFloating = false,
   onClose: _onClose,
 }) => {
-  const { messages, input, isSending, canSend, setInput, sendMessage, conversationId, isLoadingMessages } =
+  const router = useRouter();
+  const { messages, isSending, sendMessage, conversationId, isLoadingMessages } =
     useGlobalChat();
   const {
     accessibility,
@@ -39,77 +35,46 @@ export const ChatContainer: React.FC<Props> = ({
     setGridEnabled,
   } = useTheme();
 
-  useCommandRegistry();
-
-  const markdownParser = useMemo(() => new MarkdownParserService(), []);
-  const commandParser = useMemo(() => new CommandParserService(), []);
-  const presenter = useMemo(
-    () => new ChatPresenter(markdownParser, commandParser),
-    [markdownParser, commandParser],
-  );
-
   const [isOpen, setIsOpen] = useState(false);
   const [isFullScreen, setIsFullScreen] = useState(false);
   const [sessionSearchQuery, setSessionSearchQuery] = useState("");
-  const [mentionIndex, setMentionIndex] = useState(0);
   const [isClientReadyForTransitions, setIsClientReadyForTransitions] = useState(false);
 
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-
   const {
     activeTrigger,
+    canSend,
+    handleFileRemove,
+    handleFileSelect,
+    handleInputChange,
+    handleSend,
+    handleSuggestionSelect,
+    input,
+    mentionIndex,
+    pendingFiles,
+    setMentionIndex,
     suggestions: mentionSuggestions,
-    handleInput: handleMentionInput,
-    insertMention,
-  } = useMentions(textareaRef);
+  } = useChatComposerController({
+    isSending,
+    onSendMessage: sendMessage,
+    textareaRef,
+  });
 
-  // Present messages for the UI
-  const presentedMessages = useMemo(() => {
-    return messages.map((m, index) =>
-      presenter.present({
-        id: String(index),
-        role: m.role,
-        content: m.content,
-        timestamp: m.timestamp || new Date(),
-        parts: m.parts,
-      }),
-    );
-  }, [messages, presenter]);
-
-  const dynamicSuggestions = useMemo(() => {
-    const lastMsg = presentedMessages[presentedMessages.length - 1];
-    return lastMsg?.role === "assistant" && lastMsg.suggestions
-      ? lastMsg.suggestions
-      : [];
-  }, [presentedMessages]);
+  const {
+    presentedMessages,
+    dynamicSuggestions,
+    scrollDependency,
+  } = usePresentedChatMessages(messages);
 
   useUICommands(presentedMessages);
-
-  const { scrollRef, isAtBottom, scrollToBottom, handleScroll } =
-    useChatScroll(presentedMessages);
-
-  useMessageScrollBoundaryLock(scrollRef, !isFloating);
-
-  // Handle Input Change
-  const handleInputChange = useCallback((val: string, selectionStart: number) => {
-    setInput(val);
-    handleMentionInput(val, selectionStart);
-    setMentionIndex(0);
-  }, [setInput, handleMentionInput]);
 
   const handleSuggestionClick = useCallback(async (txt: string) => {
     await sendMessage(txt);
   }, [sendMessage]);
 
   const handleLinkClick = useCallback((slug: string) => {
-    console.log("Link clicked", slug);
-  }, []);
-
-  // Handle Send
-  const handleSend = async () => {
-    if (!canSend) return;
-    await sendMessage();
-  };
+    router.push(`/book/${slug}`);
+  }, [router]);
 
   useEffect(() => {
     const frame = window.requestAnimationFrame(() => {
@@ -125,6 +90,8 @@ export const ChatContainer: React.FC<Props> = ({
     () => isClientReadyForTransitions && supportsViewTransitions() && !supportsReducedMotion(),
     [isClientReadyForTransitions],
   );
+
+  const showEmbeddedStageBranding = !isFloating && !sessionSearchQuery && presentedMessages.length <= 1;
 
   if (isFloating && !isOpen) {
     return (
@@ -203,59 +170,33 @@ export const ChatContainer: React.FC<Props> = ({
       )}
 
       <div
-        className="relative flex min-h-0 w-full flex-col overflow-hidden"
-        data-chat-message-region={isFloating ? undefined : "true"}
+        className="contents"
       >
-        {/* Nuanced Background Branding */}
-        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none overflow-hidden opacity-[0.03] dark:opacity-[0.02]">
-          <div className="text-[15rem] sm:text-[22rem] lg:text-[30rem] font-bold leading-none select-none tracking-tighter">O</div>
-        </div>
-        
-        {/* SCROLL AREA: Flex-basis based scroll power */}
-        <div 
-          ref={scrollRef}
-          onScroll={handleScroll}
-          className={`z-10 flex-1 min-h-0 overflow-y-auto overscroll-contain px-3 py-3 sm:px-6 sm:py-4 ${!isFloating ? "pt-2" : ""}`}
-          data-chat-message-viewport={isFloating ? undefined : "true"}
-        >
-          {isLoadingMessages ? (
-            <div className="flex items-center justify-center h-32 text-xs opacity-40 animate-pulse">Loading conversation…</div>
-          ) : (
-          <div
-            className={`${isFullScreen ? "max-w-4xl mx-auto w-full" : "w-full"} ${!isFloating ? "min-h-full flex flex-col justify-end" : ""}`}
-            data-chat-message-stack={isFloating ? undefined : "true"}
-          >
-            <MessageList
-              messages={presentedMessages}
-              isSending={isSending}
-              dynamicSuggestions={dynamicSuggestions}
-              onSuggestionClick={handleSuggestionClick}
-              onLinkClick={handleLinkClick}
-              searchQuery={sessionSearchQuery}
-              isEmbedded={!isFloating}
-            />
-          </div>
-          )}
-        </div>
-        {!isAtBottom && (
-          <div className="absolute bottom-[max(1rem,var(--safe-area-inset-bottom))] left-0 right-0 z-10 flex justify-center pointer-events-none px-3">
-            <button
-              onClick={() => scrollToBottom()}
-              className="pointer-events-auto focus-ring min-h-11 rounded-full accent-fill px-4 py-2 text-[11px] font-bold shadow-xl transition-all hover:scale-105"
-              aria-label="Scroll to bottom"
-            >
-              ↓ Scroll to bottom
-            </button>
-          </div>
-        )}
+        <ChatMessageViewport
+          dynamicSuggestions={dynamicSuggestions}
+          isEmbedded={!isFloating}
+          isFullScreen={isFullScreen}
+          isLoadingMessages={isLoadingMessages}
+          isSending={isSending}
+          messages={presentedMessages}
+          onLinkClick={handleLinkClick}
+          onSuggestionClick={handleSuggestionClick}
+          scrollDependency={scrollDependency}
+          searchQuery={sessionSearchQuery}
+          showEmbeddedStageBranding={showEmbeddedStageBranding}
+        />
       </div>
 
       <div
-        className={`flex-none border-t border-color-theme bg-background px-3 pt-3 pb-4 sm:px-(--container-padding) sm:pb-5 ${isFloating && isFullScreen ? "safe-area-px safe-area-pb" : ""}`}
+        className={`flex-none border-t border-color-theme bg-background/95 px-3 pb-4 shadow-[0_-18px_40px_-34px_rgba(15,23,42,0.35)] backdrop-blur-sm sm:px-(--container-padding) sm:pb-5 ${isFloating && isFullScreen ? "safe-area-px safe-area-pb" : ""}`}
         data-chat-composer-row={isFloating ? undefined : "true"}
+        style={{
+          paddingTop: isFloating ? "0.75rem" : "var(--chat-composer-gap)",
+        }}
       >
         <div className={isFullScreen ? "max-w-4xl mx-auto w-full" : "w-full"}>
           <ChatInput
+            inputRef={textareaRef}
             value={input}
             onChange={handleInputChange}
             onSend={handleSend}
@@ -266,21 +207,10 @@ export const ChatContainer: React.FC<Props> = ({
             suggestions={mentionSuggestions}
             mentionIndex={mentionIndex}
             onMentionIndexChange={setMentionIndex}
-            onSuggestionSelect={(item) => {
-              if (activeTrigger?.char === "/") {
-                const cmd = commandRegistry.getCommand(item.id);
-                if (cmd) {
-                  cmd.execute();
-                  setInput("");
-                  return;
-                }
-              }
-              const newText = insertMention(item);
-              setInput(newText);
-            }}
-            pendingFiles={[]}
-            onFileSelect={() => {}}
-            onFileRemove={() => {}}
+            onSuggestionSelect={handleSuggestionSelect}
+            pendingFiles={pendingFiles}
+            onFileSelect={handleFileSelect}
+            onFileRemove={handleFileRemove}
           />
         </div>
       </div>

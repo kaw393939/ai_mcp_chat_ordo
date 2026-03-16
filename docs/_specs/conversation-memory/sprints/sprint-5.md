@@ -143,9 +143,10 @@ Tests update accordingly. No behavioral changes — pure rename refactor.
 | `librarian_remove_book` | `corpus_remove_document` | Removes a document |
 | `librarian_remove_chapter` | `corpus_remove_section` | Removes a section |
 
-The MCP server file `mcp/embedding-server.ts` registers tools using the
-new generic names. Tool handler logic is unchanged — only names and
-descriptions change.
+The runtime implementation is complete. The MCP server file
+`mcp/embedding-server.ts` now registers the canonical generic tool names,
+uses corpus-first handlers internally, and keeps legacy aliases only as
+compatibility shims.
 
 ## 5.6 Sprint Tasks
 
@@ -155,18 +156,18 @@ descriptions change.
 | 5.2 | Rename `BookRepository` port → `CorpusRepository` with `CorpusQuery` / `SectionQuery` | CONVO-090 |
 | 5.3 | Rename `BookSummaryInteractor` → `CorpusSummaryInteractor` (update `BookSummary` → `CorpusSummary`) | CONVO-090 |
 | 5.4 | Rename `BookChunkMetadata` → `DocumentChunkMetadata` in `src/core/search/ports/Chunker.ts`; update `ChunkMetadata` union | CONVO-090 |
-| 5.5 | Remove `"book_chunk"` default in `HybridSearchEngine` (L58); require explicit source type | CONVO-090 |
+| 5.5 | Replace the hardcoded `"book_chunk"` default with config-driven canonical `"document_chunk"` behavior while preserving compatibility fallbacks | CONVO-090 |
 | 5.6 | Generalize `HybridSearchResult` metadata fields (`bookTitle` → `documentTitle`, `bookSlug` → `documentSlug`, etc.) | CONVO-090 |
 | 5.7 | Update `MarkdownChunker` (1 ref) and `SearchHandlerChain` (3 refs) to use generic source type from config | CONVO-090 |
 | 5.8 | Create `corpus-config.ts` with externalized corpus metadata (name, counts, description, source type) | CONVO-090 |
 | 5.9 | Rename tool files and identifiers: `search_books` → `search_corpus`, `get_book_summary` → `get_corpus_summary`, `get_chapter` → `get_section` | CONVO-090 |
-| 5.10 | Auto-generate tool descriptions from corpus config; update `BookTools.ts` hub → `CorpusTools.ts` | CONVO-090 |
-| 5.11 | Rename adapters: `FileSystemBookRepository` → `FileSystemCorpusRepository`, `CachedBookRepository` → `CachedCorpusRepository`, `RepositoryFactory.getBookRepository()` → `getCorpusRepository()` | CONVO-090 |
-| 5.12 | Rename `src/lib/book-library.ts` → `corpus-library.ts`, `book-actions.ts` → `corpus-actions.ts`; update `tool-composition-root.ts` imports + source type | CONVO-090 |
-| 5.13 | Rename MCP librarian tools (6): `librarian_list` → `corpus_list`, `librarian_get` → `corpus_get`, `librarian_add_book` → `corpus_add_document`, `librarian_add_chapter` → `corpus_add_section`, `librarian_remove_book` → `corpus_remove_document`, `librarian_remove_chapter` → `corpus_remove_section` | CONVO-090 |
+| 5.10 | Auto-generate tool descriptions from corpus config; add `CorpusTools.ts` as the canonical command hub and keep `BookTools.ts` as a compatibility re-export | CONVO-090 |
+| 5.11 | Add canonical adapters `FileSystemCorpusRepository` / `CachedCorpusRepository` and `RepositoryFactory.getCorpusRepository()` while preserving legacy names as wrappers | CONVO-090 |
+| 5.12 | Add canonical `corpus-library.ts` and `corpus-actions.ts`; keep legacy book facades as compatibility wrappers and switch `tool-composition-root.ts` to corpus-first wiring | CONVO-090 |
+| 5.13 | Rename MCP librarian tools (6): `librarian_list` → `corpus_list`, `librarian_get` → `corpus_get`, `librarian_add_book` → `corpus_add_document`, `librarian_add_chapter` → `corpus_add_section`, `librarian_remove_book` → `corpus_remove_document`, `librarian_remove_chapter` → `corpus_remove_section`; keep legacy dispatch aliases temporarily | CONVO-090 |
 | 5.14 | Update `mcp/embedding-tool.ts` (7 refs) and `mcp/embedding-server.ts` (2 refs) to use `DocumentChunkMetadata` and generic source type | CONVO-090 |
 | 5.15 | Update `BASE_PROMPT` fallback constant and system prompt seeds in `src/lib/db/schema.ts` to use corpus config; update tool name strings in `policy.ts` | CONVO-090 |
-| 5.16 | Update route files: `src/app/books/` → `src/app/corpus/` (with redirect from old paths); handle legacy `src/app/book/` route | CONVO-090 |
+| 5.16 | Add canonical `src/app/corpus/` routes and convert old `src/app/books/` + `src/app/book/` paths into redirects | CONVO-090 |
 | 5.17 | Update `scripts/build-search-index.ts` (5 refs) to use generic source type from config | CONVO-090 |
 | 5.18 | Update all tests to use new names (~60+ refs across 10 test files — pure rename, no logic changes) | CONVO-090 |
 | 5.19 | Update `README.md` tool inventory table | CONVO-090 |
@@ -176,3 +177,19 @@ descriptions change.
 The `src/core/` layer is fully domain-agnostic. Re-deploying for a new
 domain requires only: new corpus files, prompt edits via MCP, and
 optionally new domain-specific MCP tool servers.**
+
+## 5.7 Implementation Status
+
+Sprint 5 is implemented and verified.
+
+- Canonical public tool surface: `search_corpus`, `get_section`, `get_corpus_summary`
+- Canonical MCP admin surface: `corpus_list`, `corpus_get`, `corpus_add_document`, `corpus_add_section`, `corpus_remove_document`, `corpus_remove_section`
+- Canonical source type: `document_chunk`
+- Canonical routes: `/corpus`, `/corpus/[document]`, `/corpus/[document]/[section]`
+- Compatibility preserved for legacy book/chapter naming in wrappers, aliases, and redirect routes
+
+Verification completed against the implementation:
+
+- `npm run typecheck`
+- `npm run build`
+- `npm run quality`

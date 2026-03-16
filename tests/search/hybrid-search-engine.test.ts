@@ -20,7 +20,7 @@ function makeRecord(
   // We'll set embedding in the test setup
   return {
     id,
-    sourceType: "book_chunk",
+    sourceType: "document_chunk",
     sourceId: opts.bookSlug ?? "book-1",
     chunkIndex: 0,
     chunkLevel: "passage",
@@ -31,7 +31,13 @@ function makeRecord(
     modelVersion: "test",
     embedding: new Float32Array(384), // will be replaced
     metadata: {
-      sourceType: "book_chunk",
+      sourceType: "document_chunk",
+      documentTitle: opts.bookTitle ?? "Book One",
+      documentId: opts.bookNumber ?? "1",
+      documentSlug: opts.bookSlug ?? "book-1",
+      sectionTitle: opts.chapterTitle ?? "Chapter One",
+      sectionSlug: opts.chapterSlug ?? "ch-1",
+      sectionFirstSentence: content.split(".")[0] ?? content,
       bookTitle: opts.bookTitle ?? "Book One",
       bookNumber: opts.bookNumber ?? "1",
       bookSlug: opts.bookSlug ?? "book-1",
@@ -112,7 +118,7 @@ describe("HybridSearchEngine", () => {
 
     vectorStore.upsert(records);
     const bm25Index = buildBM25Index(records);
-    bm25IndexStore.saveIndex("book_chunk", bm25Index);
+    bm25IndexStore.saveIndex("document_chunk", bm25Index);
 
     const engine = new HybridSearchEngine(
       embedder, vectorStore, new BM25Scorer(), bm25IndexStore,

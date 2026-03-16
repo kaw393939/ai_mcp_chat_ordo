@@ -1,4 +1,5 @@
 import type { Message } from "@/core/entities/conversation";
+import { buildMessageContextText } from "@/lib/chat/message-attachments";
 
 /**
  * Builds a bounded context window for LLM calls.
@@ -31,7 +32,10 @@ export function buildContextWindow(messages: Message[]): {
     return {
       contextMessages: messages
         .filter((m) => m.role !== "system")
-        .map((m) => ({ role: m.role as "user" | "assistant", content: m.content })),
+        .map((m) => ({
+          role: m.role as "user" | "assistant",
+          content: buildMessageContextText(m.content, m.parts),
+        })),
       hasSummary: false,
       summaryText: null,
     };
@@ -45,7 +49,7 @@ export function buildContextWindow(messages: Message[]): {
   return {
     contextMessages: messagesAfterSummary.map((m) => ({
       role: m.role as "user" | "assistant",
-      content: m.content,
+      content: buildMessageContextText(m.content, m.parts),
     })),
     hasSummary: true,
     summaryText: summaryMessage.content,

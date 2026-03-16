@@ -7,11 +7,13 @@ import type { VectorStore } from "@/core/search/ports/VectorStore";
 // Deps
 // ---------------------------------------------------------------------------
 
-export interface LibrarianToolDeps {
+export interface CorpusToolDeps {
   corpusDir: string; // absolute path to docs/_corpus/
   vectorStore: VectorStore; // for embedding cleanup on remove
   clearCaches: () => void; // callback to clear repo + discovery caches
 }
+
+export type LibrarianToolDeps = CorpusToolDeps;
 
 // ---------------------------------------------------------------------------
 // Security helpers (LIBRARIAN-070, LIBRARIAN-080)
@@ -119,11 +121,11 @@ function validateZipSafety(entries: AdmZip.IZipEntry[]): void {
 }
 
 // ---------------------------------------------------------------------------
-// addBookFromZip (Sprint 2 — LIBRARIAN-040)
+// addDocumentFromZip (Sprint 2 — LIBRARIAN-040)
 // ---------------------------------------------------------------------------
 
-async function addBookFromZip(
-  deps: LibrarianToolDeps,
+async function addDocumentFromZip(
+  deps: CorpusToolDeps,
   zipBase64: string,
 ) {
   // 1. Decode base64 to Buffer
@@ -163,7 +165,7 @@ async function addBookFromZip(
   // 4. Check slug uniqueness — never overwrite
   const targetDir = assertSafePath(deps.corpusDir, manifest.slug as string);
   if (await pathExists(targetDir)) {
-    throw new Error(`Book already exists: ${manifest.slug as string}`);
+    throw new Error(`Document already exists: ${manifest.slug as string}`);
   }
 
   // 5. Extract to temp directory first (atomic)
@@ -233,7 +235,7 @@ async function addBookFromZip(
       directory: `_corpus/${manifest.slug as string}`,
       chaptersWritten,
       indexed: false,
-      hint: "Run rebuild_index to make this book searchable.",
+      hint: "Run rebuild_index to make this document searchable.",
     };
   } catch (err) {
     // Rollback: remove temp directory on any failure
@@ -247,10 +249,10 @@ async function addBookFromZip(
 }
 
 // ---------------------------------------------------------------------------
-// librarian_list
+// corpus_list
 // ---------------------------------------------------------------------------
 
-export async function librarianList(deps: LibrarianToolDeps) {
+export async function corpusList(deps: CorpusToolDeps) {
   const collected: Array<{
     slug: string;
     title: string;
@@ -331,18 +333,27 @@ export async function librarianList(deps: LibrarianToolDeps) {
   collected.sort((a, b) => a.sortOrder - b.sortOrder);
 
   // Strip sortOrder from output
-  const books = collected.map(({ sortOrder: _, ...rest }) => rest);
-  const totalChapters = books.reduce((sum, b) => sum + b.chapterCount, 0);
+  const documents = collected.map(({ sortOrder: _, ...rest }) => rest);
+  const totalSections = documents.reduce((sum, document) => sum + document.chapterCount, 0);
 
-  return { books, totalBooks: books.length, totalChapters };
+  return {
+    documents,
+    books: documents,
+    totalDocuments: documents.length,
+    totalBooks: documents.length,
+    totalSections,
+    totalChapters: totalSections,
+  };
 }
 
+export const librarianList = corpusList;
+
 // ---------------------------------------------------------------------------
-// librarian_get_book
+// corpus_get
 // ---------------------------------------------------------------------------
 
-export async function librarianGetBook(
-  deps: LibrarianToolDeps,
+export async function corpusGetDocument(
+  deps: CorpusToolDeps,
   args: { slug: string },
 ) {
   assertValidSlug(args.slug);
@@ -351,7 +362,7 @@ export async function librarianGetBook(
   const manifestPath = path.join(bookDir, "book.json");
 
   if (!(await pathExists(manifestPath))) {
-    throw new Error(`Book not found: "${args.slug}".`);
+    throw new Error(`Document not found: "${args.slug}".`);
   }
 
   const raw = await fs.readFile(manifestPath, "utf-8");
@@ -396,7 +407,7 @@ export async function librarianGetBook(
     // no chapters dir — valid (book with zero chapters)
   }
 
-  return {
+  const document = {
     slug: manifest.slug as string,
     title: manifest.title as string,
     number: manifest.number as string,
@@ -405,14 +416,22 @@ export async function librarianGetBook(
     directory: `_corpus/${args.slug}`,
     chapters,
   };
+
+  return {
+    ...document,
+    document,
+    sections: chapters,
+  };
 }
 
+export const librarianGetBook = corpusGetDocument;
+
 // ---------------------------------------------------------------------------
-// librarian_add_book (manual JSON + zip dispatch)
+// corpus_add_document (manual JSON + zip dispatch)
 // ---------------------------------------------------------------------------
 
-export async function librarianAddBook(
-  deps: LibrarianToolDeps,
+export async function corpusAddDocument(
+  deps: CorpusToolDeps,
   args: {
     slug?: string;
     title?: string;
@@ -426,13 +445,13 @@ export async function librarianAddBook(
 ) {
   // Dispatch to zip mode if zip_base64 is provided
   if (args.zip_base64) {
-    return addBookFromZip(deps, args.zip_base64);
+    return addDocumentFromZip(deps, args.zip_base64);
   }
 
   // Manual mode — validate required fields
   if (!args.slug || !args.title || !args.number) {
     throw new Error(
-      "librarian_add_book requires slug, title, number, sortOrder, and domain.",
+      "corpus_add_document requires slug, title, number, sortOrder, and domain.",
     );
   }
   if (typeof args.sortOrder !== "number") {
@@ -455,7 +474,7 @@ export async function librarianAddBook(
   // 2. LIBRARIAN-090: directory = slug
   const bookDir = assertSafePath(deps.corpusDir, args.slug);
   if (await pathExists(bookDir)) {
-    throw new Error(`Book already exists: ${args.slug}`);
+    throw new Error(`Document already exists: ${args.slug}`);
   }
 
   // 3. Create directory structure
@@ -496,16 +515,18 @@ export async function librarianAddBook(
     directory: `_corpus/${args.slug}`,
     chaptersWritten,
     indexed: false,
-    hint: "Run rebuild_index to make this book searchable.",
+    hint: "Run rebuild_index to make this document searchable.",
   };
 }
 
+export const librarianAddBook = corpusAddDocument;
+
 // ---------------------------------------------------------------------------
-// librarian_add_chapter
+// corpus_add_section
 // ---------------------------------------------------------------------------
 
-export async function librarianAddChapter(
-  deps: LibrarianToolDeps,
+export async function corpusAddSection(
+  deps: CorpusToolDeps,
   args: { book_slug: string; chapter_slug: string; content: string },
 ) {
   assertValidSlug(args.book_slug);
@@ -517,7 +538,7 @@ export async function librarianAddChapter(
 
   const bookDir = assertSafePath(deps.corpusDir, args.book_slug);
   if (!(await pathExists(bookDir))) {
-    throw new Error(`Book not found: "${args.book_slug}".`);
+    throw new Error(`Document not found: "${args.book_slug}".`);
   }
 
   const chaptersDir = path.join(bookDir, "chapters");
@@ -536,19 +557,21 @@ export async function librarianAddChapter(
   };
 }
 
+export const librarianAddChapter = corpusAddSection;
+
 // ---------------------------------------------------------------------------
-// librarian_remove_book
+// corpus_remove_document
 // ---------------------------------------------------------------------------
 
-export async function librarianRemoveBook(
-  deps: LibrarianToolDeps,
+export async function corpusRemoveDocument(
+  deps: CorpusToolDeps,
   args: { slug: string },
 ) {
   assertValidSlug(args.slug);
 
   const bookDir = assertSafePath(deps.corpusDir, args.slug);
   if (!(await pathExists(bookDir))) {
-    throw new Error(`Book not found: "${args.slug}".`);
+    throw new Error(`Document not found: "${args.slug}".`);
   }
 
   // Enumerate chapters so we can clean up embeddings
@@ -584,12 +607,14 @@ export async function librarianRemoveBook(
   };
 }
 
+export const librarianRemoveBook = corpusRemoveDocument;
+
 // ---------------------------------------------------------------------------
-// librarian_remove_chapter
+// corpus_remove_section
 // ---------------------------------------------------------------------------
 
-export async function librarianRemoveChapter(
-  deps: LibrarianToolDeps,
+export async function corpusRemoveSection(
+  deps: CorpusToolDeps,
   args: { book_slug: string; chapter_slug: string },
 ) {
   assertValidSlug(args.book_slug);
@@ -597,7 +622,7 @@ export async function librarianRemoveChapter(
 
   const bookDir = assertSafePath(deps.corpusDir, args.book_slug);
   if (!(await pathExists(bookDir))) {
-    throw new Error(`Book not found: "${args.book_slug}".`);
+    throw new Error(`Document not found: "${args.book_slug}".`);
   }
 
   const chapterPath = assertSafePath(
@@ -628,3 +653,5 @@ export async function librarianRemoveChapter(
     embeddingsDeleted,
   };
 }
+
+export const librarianRemoveChapter = corpusRemoveSection;
